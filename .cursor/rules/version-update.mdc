@@ -1,0 +1,15 @@
+---
+description: mock-exam-extractor.html 수정 시 버전 업데이트 필수
+globs: **/mock-exam-extractor.html
+alwaysApply: true
+---
+
+# 버전 업데이트 규칙 (필수)
+
+`mock-exam-extractor.html`를 **수정할 때마다 반드시** 버전을 올린다.
+
+- **위치**: `<p class="version">v4.3</p>` (header 영역)
+- **규칙**: 수정 1회 → 버전 1단계 증가
+  - 패치: v4.3 → v4.4
+  - 마이너: v4.9 → v5.0
+- **실행 순서**: 수정 적용 후, 마지막으로 버전 태그 업데이트
