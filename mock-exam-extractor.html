@@ -4,10 +4,12 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>📚 모의고사 문제 추출기</title>
+  <link rel="icon" href="favicon.png" type="image/png">
+  <link href="https://hangeul.pstatic.net/hangeul_static/css/nanum-square-neo.css" rel="stylesheet">
   <style>
     * { box-sizing: border-box; }
     body {
-      font-family: '맑은 고딕', 'Malgun Gothic', sans-serif;
+      font-family: 'NanumSquareNeo', '맑은 고딕', sans-serif;
       margin: 0;
       padding: 20px;
       background: #fff;
@@ -52,6 +54,7 @@
       display: block;
       width: 100%;
       padding: 14px 24px;
+      font-family: 'NanumSquareNeo', '맑은 고딕', sans-serif;
       font-size: 1.1rem;
       font-weight: 600;
       border: none;
@@ -88,7 +91,7 @@
       max-height: 500px;
       overflow-y: auto;
       white-space: pre-wrap;
-      font-family: 'Consolas', monospace;
+      font-family: 'NanumSquareNeo', monospace;
       font-size: 0.9rem;
       line-height: 1.5;
       border: 1px solid #ddd;
@@ -126,7 +129,7 @@
     .accordion-item.collapsed .accordion-header::after { transform: rotate(-90deg); }
     .accordion-body {
       padding: 16px;
-      font-family: 'Consolas', monospace;
+      font-family: 'NanumSquareNeo', monospace;
       font-size: 0.85rem;
       line-height: 1.6;
       white-space: pre-wrap;
@@ -138,6 +141,7 @@
     .accordion-item:last-child .accordion-body { border-bottom: none; }
     .copy-btn {
       padding: 4px 10px;
+      font-family: 'NanumSquareNeo', '맑은 고딕', sans-serif;
       font-size: 0.75rem;
       border: 1px solid #0096ff;
       background: #fff;
@@ -157,6 +161,7 @@
       padding: 12px 24px;
       border-radius: 8px;
       text-decoration: none;
+      font-family: 'NanumSquareNeo', '맑은 고딕', sans-serif;
       font-weight: 600;
       color: #fff;
       transition: transform 0.2s, box-shadow 0.2s;
@@ -186,7 +191,7 @@
   <div class="container">
     <main>
       <h1>📚 모의고사 문제 추출기</h1>
-      <p class="version">v4.3</p>
+      <p class="version">v4.6</p>
       <div id="dropZone">
         <p id="dropZoneText">PDF를 드래그하거나 클릭하여 업로드</p>
         <p class="hint">모의고사, 시험지, 학습자료 PDF 지원</p>
@@ -216,7 +221,7 @@
 <script>
   (function() {
     if (typeof pdfjsLib === 'undefined') {
-      document.body.innerHTML = '<main style="max-width:600px;margin:80px auto;text-align:center;font-family:맑은 고딕,sans-serif;"><h1>⚠️ PDF.js 로드 실패</h1><p>인터넷 연결을 확인하거나, <strong>로컬 서버</strong>로 실행해주세요.<br><code>npx serve -l 3333</code> 후 http://localhost:3333/mock-exam-extractor.html 접속</p></main>';
+      document.body.innerHTML = '<main style="max-width:600px;margin:80px auto;text-align:center;font-family:NanumSquareNeo,맑은 고딕,sans-serif;"><h1>⚠️ PDF.js 로드 실패</h1><p>인터넷 연결을 확인하거나, <strong>로컬 서버</strong>로 실행해주세요.<br><code>npx serve -l 3333</code> 후 http://localhost:3333/mock-exam-extractor.html 접속</p></main>';
       return;
     }
     if (location.protocol === 'file:') {
@@ -1408,7 +1413,7 @@
   <meta charset="UTF-8">
   <title>모의고사</title>
   <style>
-    body { font-family: '맑은 고딕', sans-serif; margin: 20px; }
+    body { font-family: 'NanumSquareNeo', '맑은 고딕', sans-serif; margin: 20px; }
     .question { page-break-inside: avoid; margin-bottom: 20px; border-bottom: 1px solid #ddd; padding-bottom: 15px; }
     .number { font-weight: bold; color: #0066cc; }
     .instruction { color: #555; font-weight: 500; margin: 8px 0; }
