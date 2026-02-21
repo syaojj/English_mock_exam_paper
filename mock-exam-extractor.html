@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>📚 모의고사 문제 추출기</title>
+  <title>모의고사 문제 추출기</title>
   <link rel="icon" href="favicon.png" type="image/png">
   <link href="https://hangeul.pstatic.net/hangeul_static/css/nanum-square-neo.css" rel="stylesheet">
   <style>
@@ -25,10 +25,20 @@
       top: 20px;
     }
     h1 {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
       text-align: center;
       margin-bottom: 24px;
       font-weight: 700;
       color: #333;
+    }
+    .title-icon {
+      width: 40px;
+      height: 40px;
+      object-fit: contain;
+      vertical-align: middle;
     }
     .version { text-align: right; font-size: 0.8rem; color: #888; margin-top: -16px; margin-bottom: 8px; }
     #dropZone {
@@ -174,6 +184,11 @@
       transform: translateY(-2px);
       box-shadow: 0 4px 12px rgba(0,0,0,0.3);
     }
+    #fullPreviewWrap {
+      margin-top: 24px;
+      padding-top: 20px;
+      border-top: 1px solid #e0e0e0;
+    }
     @media (max-width: 900px) {
       .container { flex-direction: column; }
       main { flex: none; }
@@ -190,8 +205,8 @@
 <body>
   <div class="container">
     <main>
-      <h1>📚 모의고사 문제 추출기</h1>
-      <p class="version">v4.6</p>
+      <h1><img src="favicon.png" alt="" class="title-icon"> 모의고사 문제 추출기</h1>
+      <p class="version">v4.9</p>
       <div id="dropZone">
         <p id="dropZoneText">PDF를 드래그하거나 클릭하여 업로드</p>
         <p class="hint">모의고사, 시험지, 학습자료 PDF 지원</p>
