@@ -206,7 +206,7 @@
   <div class="container">
     <main>
       <h1><img src="favicon.png" alt="" class="title-icon"> 모의고사 문제 추출기</h1>
-      <p class="version">v7.10</p>
+      <p class="version">v7.8</p>
       <div id="dropZone">
         <p id="dropZoneText">PDF를 드래그하거나 클릭하여 업로드</p>
         <p class="hint">모의고사, 시험지, 학습자료 PDF 지원</p>
@@ -297,15 +297,9 @@
   const PAGE_HEADER_PATTERN = /고\s*1\s*영어\s*영역\s*\d*\]?\s*$/gm;
   const PAGE_FOOTER_WITH_UNDERLINE = /\n\s*고\s*1\s*영어\s*영역\s*\d*[^\n]*\n?\s*[━─_\s]{2,}\s*$/;
   const TRAILING_DECORATION_LINE = /\n\s*[━─_]{2,}\s*$/;
-  // 추출 원본(디버그): 캡처 범위(36~37 포함 시 지문 복원용), 노출 범위(UI에는 38~39, 41~42만)
-  const DEBUG_RAW_CAPTURE_RANGES = [{ start: 36, end: 37 }, { start: 38, end: 39 }, { start: 41, end: 42 }];
-  const DEBUG_RAW_DISPLAY_RANGES = [{ start: 38, end: 39 }, { start: 41, end: 42 }];
-  function isInDebugCaptureRanges(numInt) {
-    return Number.isInteger(numInt) && DEBUG_RAW_CAPTURE_RANGES.some(r => numInt >= r.start && numInt <= r.end);
-  }
-  function isInDebugDisplayRanges(numInt) {
-    return Number.isInteger(numInt) && DEBUG_RAW_DISPLAY_RANGES.some(r => numInt >= r.start && numInt <= r.end);
-  }
+  // 추출 원본(디버그): 제외할 문제 번호, 포함할 범위 35~45
+  const DEBUG_RAW_EXCLUDE_NUMS = [4, 13, 14, 25];
+  const DEBUG_RAW_INCLUDE_RANGE = { start: 35, end: 45 };
 
   function processImagePlaceholders(text) {
     return text;
@@ -1336,7 +1330,9 @@
         const num = String(q.number);
         if (num.includes('~')) continue;
         const numInt = parseInt(num, 10);
-        if (!isInDebugCaptureRanges(numInt)) continue;
+        if (DEBUG_RAW_EXCLUDE_NUMS.includes(numInt)) continue;
+        const inRange3545 = numInt >= DEBUG_RAW_INCLUDE_RANGE.start && numInt <= DEBUG_RAW_INCLUDE_RANGE.end;
+        if (!inRange3545 && !isDialogueSpeakerOnly(q) && !isMismatchWithEmbeddedChoices(q)) continue;
         const next = numInt + 1;
         const blockRe = new RegExp('(?:' + num + '\\.\\s|\\[' + num + '~\\d+\\][\\.]?\\s)[\\s\\S]*?(?=\\s*(?:' + next + '\\.\\s|\\[' + next + '~)|$)', '');
         const block = text.match(blockRe);
@@ -1440,7 +1436,9 @@
         const num = String(q.number);
         if (num.includes('~')) continue;
         const numInt = parseInt(num, 10);
-        if (!isInDebugCaptureRanges(numInt)) continue;
+        if (DEBUG_RAW_EXCLUDE_NUMS.includes(numInt)) continue;
+        const inRange3545 = numInt >= DEBUG_RAW_INCLUDE_RANGE.start && numInt <= DEBUG_RAW_INCLUDE_RANGE.end;
+        if (!inRange3545 && !isDialogueSpeakerOnly(q) && !isMismatchWithEmbeddedChoices(q)) continue;
         const next = numInt + 1;
         const blockRe = new RegExp('(?:' + num + '\\.\\s|\\[' + num + '~\\d+\\][\\.]?\\s)[\\s\\S]*?(?=\\s*(?:' + next + '\\.\\s|\\[' + next + '~)|$)', '');
         const block = text.match(blockRe);
@@ -1637,19 +1635,11 @@
     out += `📋 추출일시: ${dateStr} · 총 ${questionCount(questions)}개 문제</div>`;
     if (debugRaw && Object.keys(debugRaw).length) {
       const debugNums = Object.keys(debugRaw).sort((a, b) => parseInt(a, 10) - parseInt(b, 10));
-      const debugNumsDisplay = debugNums.filter(n => isInDebugDisplayRanges(parseInt(n, 10)));
-      const parts = [];
-      for (const r of DEBUG_RAW_DISPLAY_RANGES) {
-        const have = debugNumsDisplay.filter(n => { const x = parseInt(n, 10); return x >= r.start && x <= r.end; });
-        if (have.length === r.end - r.start + 1) parts.push(`[${r.start}~${r.end}]`);
-        else if (have.length) parts.push(have.join(', '));
-      }
-      const debugLabel = parts.length ? parts.join(', ') : debugNumsDisplay.join(', ');
       out += `<details open style="margin:12px;padding:12px;background:#fff8e6;border:1px solid #e6d9b3;border-radius:8px;font-size:0.85rem">`;
-      out += `<summary style="cursor:pointer;font-weight:600;color:#8b6914">🔍 추출 원본 (디버그) 문제 ${debugLabel}</summary>`;
+      out += `<summary style="cursor:pointer;font-weight:600;color:#8b6914">🔍 추출 원본 (디버그) 문제 ${debugNums.join(', ')}</summary>`;
       out += `<div style="margin-top:12px">`;
       out += `<button type="button" class="copy-btn copy-debug-btn" style="margin-bottom:8px">📋 디버그 내용 복사</button>`;
-      for (const num of debugNumsDisplay) {
+      for (const num of debugNums) {
         const d = debugRaw[num];
         if (!d) continue;
         out += `<div style="margin-bottom:16px;padding:8px;background:#fff;border:1px solid #e6d9b3;border-radius:6px">`;
@@ -1713,9 +1703,8 @@
       const debugBtn = e.target.closest('.copy-debug-btn');
       if (debugBtn && debugRaw && Object.keys(debugRaw).length) {
         const debugNums = Object.keys(debugRaw).sort((a, b) => parseInt(a, 10) - parseInt(b, 10));
-        const debugNumsDisplay = debugNums.filter(n => isInDebugDisplayRanges(parseInt(n, 10)));
         let txt = '=== 추출 원본 (디버그) ===\n\n';
-        for (const num of debugNumsDisplay) {
+        for (const num of debugNums) {
           const d = debugRaw[num];
           if (!d) continue;
           txt += '='.repeat(18) + '\n문제 ' + num + '\n' + '='.repeat(18) + '\n\n1. PDF 원본 블록\n' + '─'.repeat(40) + '\n' + (d.rawBlock || '(없음)') + '\n\n2. 파싱 직후 (후처리 전)\n' + '─'.repeat(40) + '\n지시문: ' + (d.rawQuestion?.instruction || '') + '\n\n지문:\n' + (d.rawQuestion?.content || '') + '\n\n선택지:\n' + (d.rawQuestion?.choices || []).map(c => c.mark + ' ' + c.text).join('\n') + '\n\n';
