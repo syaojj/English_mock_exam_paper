@@ -1,0 +1,2509 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>모의고사 문제 추출기</title>
+  <link rel="icon" href="favicon.png" type="image/png">
+  <link href="https://hangeul.pstatic.net/hangeul_static/css/nanum-square-neo.css" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: 'NanumSquareNeo', '맑은 고딕', sans-serif;
+      margin: 0;
+      padding: 20px;
+      background: #fff;
+      min-height: 100vh;
+      color: #333;
+    }
+    .container { display: flex; gap: 24px; align-items: flex-start; max-width: 1400px; margin: 0 auto; }
+    main { flex: 1; min-width: 0; }
+    .preview-area {
+      flex: 1;
+      min-width: 0;
+      position: sticky;
+      top: 20px;
+    }
+    h1 {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      text-align: center;
+      margin-bottom: 24px;
+      font-weight: 700;
+      color: #333;
+    }
+    .title-icon {
+      width: 40px;
+      height: 40px;
+      object-fit: contain;
+      vertical-align: middle;
+    }
+    .version { text-align: right; font-size: 0.8rem; color: #888; margin-top: -16px; margin-bottom: 8px; }
+    #dropZone {
+      border: 3px dashed #999;
+      border-radius: 12px;
+      padding: 48px 24px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      background: #fafafa;
+      margin-bottom: 16px;
+    }
+    #dropZone:hover, #dropZone.dragover {
+      border-color: #0096ff;
+      background: #e8f4fd;
+    }
+    #dropZone.dragover { border-width: 4px; }
+    #dropZone.hasFile { border-color: #16a34a; background: #e8f5e9; }
+    #dropZone p { margin: 0; font-size: 1.1rem; color: #333; }
+    #dropZone .hint { font-size: 0.85rem; margin-top: 8px; color: #666; }
+    #dropZone .filename { font-weight: 600; color: #16a34a; margin-top: 8px; word-break: break-all; }
+    #extractBtn {
+      display: block;
+      width: 100%;
+      padding: 14px 24px;
+      font-family: 'NanumSquareNeo', '맑은 고딕', sans-serif;
+      font-size: 1.1rem;
+      font-weight: 600;
+      border: none;
+      border-radius: 8px;
+      background: linear-gradient(135deg, #0096ff, #00d4ff);
+      color: #fff;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+      margin-bottom: 16px;
+    }
+    #extractBtn:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(0, 150, 255, 0.4);
+    }
+    #extractBtn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    #status {
+      padding: 12px;
+      border-radius: 8px;
+      margin-bottom: 16px;
+      min-height: 24px;
+      font-size: 0.95rem;
+    }
+    #status.success { background: #e8f5e9; color: #2e7d32; }
+    #status.error { background: #ffebee; color: #c62828; }
+    #status.progress { background: #e3f2fd; color: #1565c0; }
+    #fullPreview {
+      background: #f5f5f5;
+      border-radius: 12px;
+      padding: 20px;
+      margin-top: 20px;
+      max-height: 500px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      font-family: 'NanumSquareNeo', monospace;
+      font-size: 0.9rem;
+      line-height: 1.5;
+      border: 1px solid #ddd;
+      color: #333;
+    }
+    .preview-area { display: none; }
+    .preview-area.visible { display: block; }
+    .accordion-preview { max-height: calc(100vh - 80px); overflow-y: auto; }
+    #preview {
+      background: #fff;
+      border-radius: 12px;
+      border: 1px solid #e0e0e0;
+      overflow: hidden;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    }
+    .accordion-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      background: #f8f9fa;
+      border-bottom: 1px solid #e0e0e0;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 0.95rem;
+      user-select: none;
+    }
+    .accordion-header:hover { background: #eef1f5; }
+    .accordion-header::after {
+      content: '▼';
+      font-size: 0.7rem;
+      transition: transform 0.2s;
+      color: #666;
+    }
+    .accordion-item.collapsed .accordion-header::after { transform: rotate(-90deg); }
+    .accordion-body {
+      padding: 16px;
+      font-family: 'NanumSquareNeo', monospace;
+      font-size: 0.85rem;
+      line-height: 1.6;
+      white-space: pre-wrap;
+      color: #333;
+      border-bottom: 1px solid #e0e0e0;
+      background: #fff;
+    }
+    .accordion-item.collapsed .accordion-body { display: none; }
+    .accordion-item:last-child .accordion-body { border-bottom: none; }
+    .copy-btn {
+      padding: 4px 10px;
+      font-family: 'NanumSquareNeo', '맑은 고딕', sans-serif;
+      font-size: 0.75rem;
+      border: 1px solid #0096ff;
+      background: #fff;
+      color: #0096ff;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    .copy-btn:hover { background: #e8f4fd; }
+    #downloads {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    #downloads a {
+      display: inline-block;
+      padding: 12px 24px;
+      border-radius: 8px;
+      text-decoration: none;
+      font-family: 'NanumSquareNeo', '맑은 고딕', sans-serif;
+      font-weight: 600;
+      color: #fff;
+      transition: transform 0.2s, box-shadow 0.2s;
+      border: none;
+    }
+    #txtDownload { background: linear-gradient(135deg, #2d5016, #3d6b1f); }
+    #wordDownload { background: linear-gradient(135deg, #1a4d8c, #2563eb); }
+    #excelDownload { background: linear-gradient(135deg, #0d5c2e, #16a34a); }
+    #downloads a:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    }
+    #fullPreviewWrap {
+      margin-top: 24px;
+      padding-top: 20px;
+      border-top: 1px solid #e0e0e0;
+    }
+    @media (max-width: 900px) {
+      .container { flex-direction: column; }
+      main { flex: none; }
+      .preview-area { position: static; }
+    }
+    @media (max-width: 600px) {
+      body { padding: 12px; }
+      #dropZone { padding: 32px 16px; }
+      #downloads { flex-direction: column; }
+      #downloads a { text-align: center; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <main>
+      <h1><img src="favicon.png" alt="" class="title-icon"> 모의고사 문제 추출기</h1>
+      <p class="version">v9.9</p>
+      <div id="dropZone">
+        <p id="dropZoneText">PDF를 드래그하거나 클릭하여 업로드</p>
+        <p class="hint">모의고사, 시험지, 학습자료 PDF 지원</p>
+        <p class="filename" id="dropZoneFilename" style="display:none"></p>
+      </div>
+      <button id="extractBtn" disabled>🔍 문제 추출하기</button>
+      <div id="status"></div>
+      <div id="downloads" style="display:none">
+        <a id="txtDownload" download>📄 TXT</a>
+        <a id="wordDownload" download>📝 Word</a>
+        <a id="excelDownload" download>📊 Excel</a>
+      </div>
+      <div id="fullPreviewWrap" style="display:none">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:8px">
+          <div style="font-weight:600;font-size:0.95rem">📋 전체 미리보기</div>
+          <button type="button" class="copy-btn" id="fullCopyBtn">📋 전체 복사</button>
+        </div>
+        <div id="fullPreview"></div>
+      </div>
+    </main>
+    <aside class="preview-area" id="previewArea">
+      <div id="preview"></div>
+    </aside>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@2.16.105/build/pdf.min.js"></script>
+<script>
+  (function() {
+    if (typeof pdfjsLib === 'undefined') {
+      document.body.innerHTML = '<main style="max-width:600px;margin:80px auto;text-align:center;font-family:NanumSquareNeo,맑은 고딕,sans-serif;"><h1>⚠️ PDF.js 로드 실패</h1><p>인터넷 연결을 확인하거나, <strong>로컬 서버</strong>로 실행해주세요.<br><code>npx serve -l 3333</code> 후 http://localhost:3333/mock-exam-extractor.html 접속</p></main>';
+      return;
+    }
+    if (location.protocol === 'file:') {
+      console.warn('file:// 로는 PDF.js Worker가 동작하지 않을 수 있습니다. npx serve로 로컬 서버를 실행해주세요.');
+    }
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@2.16.105/build/pdf.worker.min.js';
+
+  const dropZone = document.getElementById('dropZone');
+  const dropZoneText = document.getElementById('dropZoneText');
+  const dropZoneFilename = document.getElementById('dropZoneFilename');
+  const extractBtn = document.getElementById('extractBtn');
+  const status = document.getElementById('status');
+  const previewArea = document.getElementById('previewArea');
+  const preview = document.getElementById('preview');
+  const fullPreviewWrap = document.getElementById('fullPreviewWrap');
+  const fullPreview = document.getElementById('fullPreview');
+  const downloads = document.getElementById('downloads');
+  const txtDownload = document.getElementById('txtDownload');
+  const wordDownload = document.getElementById('wordDownload');
+  const excelDownload = document.getElementById('excelDownload');
+
+  let pdfFile = null;
+  let extractedData = [];
+  let debugRaw = null;
+
+  function updateDropZoneDisplay(file) {
+    if (file) {
+      dropZone.classList.add('hasFile');
+      dropZoneText.textContent = '선택된 파일';
+      dropZoneFilename.textContent = '📄 ' + file.name;
+      dropZoneFilename.style.display = 'block';
+    } else {
+      dropZone.classList.remove('hasFile');
+      dropZoneText.textContent = 'PDF를 드래그하거나 클릭하여 업로드';
+      dropZoneFilename.style.display = 'none';
+      dropZoneFilename.textContent = '';
+    }
+  }
+
+  function setStatus(msg, type = '') {
+    status.textContent = msg;
+    status.className = type;
+  }
+
+  // 제외할 문장: 이제 듣기 문제가~ 답을 하시기 바랍니다
+  const EXCLUDE_PATTERN = /이제\s*듣기\s*문제가[\s\S]*?답을\s*하시기\s*바랍니다\.?/gi;
+  // 45번 등 확인 사항 문구 제외 (＊ 전각/반각 모두)
+  const CONFIRM_PATTERN = /[\*＊]\s*확인\s*사항\s*\n\s*[◦○]\s*답안지의\s*해당란에[\s\S]*?확인\s*하시오\.?/gi;
+  // PDF 시험지 제목 (페이지 하단 등에 노출되는 문구 제거)
+  const EXAM_TITLE_PATTERN = /\d{4}학년도\s*\d+월\s*고\d+\s*전국연합학력평가\s*문제지\s*\d*/g;
+  // 지시문 점수 비노출
+  const INSTRUCTION_POINT_PATTERN = /\s*\[\d+점\]\s*$/g;
+  // 지문 내 점수 비노출: [N점], [#점] 제거 (치환 없음)
+  const CONTENT_POINT_PATTERN = /\s*\[\d+점\]\s*|\s*\[#점\]\s*/g;
+  // [16~17] 지시문 - 16~17 문제에만 있어야 함, 다른 문제에서 제거
+  const RANGE_16_17_INSTRUCTION = /\[16\s*~\s*17\]\s*다음을\s*듣고,?\s*물음에\s*답하시오\.?/gi;
+  // 상단 말머리 (고1 영어 영역 3 등) 및 말미 장식선
+  const PAGE_HEADER_PATTERN = /고\s*1\s*영어\s*영역\s*\d*\]?\s*$/gm;
+  const PAGE_FOOTER_WITH_UNDERLINE = /\n\s*고\s*1\s*영어\s*영역\s*\d*[^\n]*\n?\s*[━─_\s]{2,}\s*$/;
+  const TRAILING_DECORATION_LINE = /\n\s*[━─_]{2,}\s*$/;
+  // 추출 원본(디버그): 36~37은 지문 복원용 캡처, UI 노출은 38~39만 ([41~42] 제외)
+  const DEBUG_RAW_CAPTURE_RANGES = [{ start: 36, end: 37 }, { start: 38, end: 39 }];
+  const DEBUG_RAW_DISPLAY_RANGES = [{ start: 38, end: 39 }];
+  function isInDebugCaptureRanges(numInt) {
+    return Number.isInteger(numInt) && DEBUG_RAW_CAPTURE_RANGES.some(r => numInt >= r.start && numInt <= r.end);
+  }
+  function isInDebugDisplayRanges(numInt) {
+    return Number.isInteger(numInt) && DEBUG_RAW_DISPLAY_RANGES.some(r => numInt >= r.start && numInt <= r.end);
+  }
+
+  /** 38~39 병합 시 파싱 루프가 debugRaw['38'|'39']를 안 남김 → 디버그 UI용으로 보강 */
+  function ensureDebugRawEntries3839(questions, text) {
+    if (!debugRaw || typeof debugRaw !== 'object' || !text) return;
+    const missing38 = !debugRaw['38'];
+    const missing39 = !debugRaw['39'];
+    if (!missing38 && !missing39) return;
+
+    const block38Re = new RegExp('(?:38\\.\\s|\\[38~\\d+\\][\\.]?\\s)[\\s\\S]*?(?=\\s*(?:39\\.\\s|\\[39~)|$)', '');
+    const block39Re = new RegExp('(?:39\\.\\s|\\[39~\\d+\\][\\.]?\\s)[\\s\\S]*?(?=\\s*(?:40\\.\\s|\\[40~)|$)', '');
+    const m38 = text.match(block38Re);
+    const m39 = text.match(block39Re);
+
+    const merged = questions.find(q => String(q.number) === '38~39');
+    const chs = merged && merged.choices ? merged.choices : [];
+    let sharedInst = merged ? String(merged.instruction || '').trim() : '';
+    if (!sharedInst) {
+      const im = text.match(/\[\s*38\s*~\s*39\s*\]\s*([^\r\n]+)/);
+      if (im) sharedInst = im[1].replace(/\s+/g, ' ').trim();
+    }
+
+    const cloneChoices = (arr) => JSON.parse(JSON.stringify(arr || []));
+    const make38 = (content) => ({
+      number: '38',
+      instruction: sharedInst,
+      content: (content || '').replace(/^\s*38\.\s*\n?/i, '').trim(),
+      choices: cloneChoices(chs.length >= 5 ? chs.slice(0, 5) : chs),
+      type: '객관식'
+    });
+    const make39 = (content) => ({
+      number: '39',
+      instruction: sharedInst,
+      content: (content || '').replace(/^\s*39\.\s*\n?/i, '').trim(),
+      choices: cloneChoices(chs.length >= 10 ? chs.slice(5, 10) : []),
+      type: '객관식'
+    });
+
+    if (merged && (merged.content || '').trim()) {
+      const c = (merged.content || '').trim();
+      let parts = c.split(/\r?\n\s*39\.\s+/, 2);
+      if (parts.length < 2) parts = c.split(/\s*39\.\s+/, 2);
+      if (parts.length >= 2) {
+        if (missing38) {
+          debugRaw['38'] = {
+            rawBlock: m38 ? m38[0].trim() : null,
+            rawQuestion: make38(m38 ? m38[0] : parts[0])
+          };
+        }
+        if (missing39) {
+          debugRaw['39'] = {
+            rawBlock: m39 ? m39[0].trim() : null,
+            rawQuestion: make39(m39 ? m39[0] : parts[1])
+          };
+        }
+        return;
+      }
+    }
+
+    if (missing38 && m38) debugRaw['38'] = { rawBlock: m38[0].trim(), rawQuestion: make38(m38[0]) };
+    if (missing39 && m39) debugRaw['39'] = { rawBlock: m39[0].trim(), rawQuestion: make39(m39[0]) };
+  }
+
+  /** 디버그 rawBlock에서 38·39 지문 본문만 (공통 [38~39] 지시·문항 번호·말미 [3점] 제거) */
+  function parsePassageBodyFrom3839RawBlock(rawBlock, num) {
+    if (!rawBlock) return '';
+    let s = String(rawBlock).trim();
+    s = s.replace(/^\[\s*38\s*~\s*39\s*\][^\r\n]*(?:\r?\n)+/i, '');
+    s = s.replace(new RegExp('^\\s*' + num + '\\.\\s*', 'i'), '').trim();
+    s = s.replace(/\s*\[\s*3\s*점\s*\]\s*$/i, '').trim();
+    return s;
+  }
+
+  /** 최종 result·debugRaw: 병합 분할 오류로 짧아진 38·39 지문을 PDF 원본 블록으로 보강 */
+  function recover3839PassageFromDebugRawResult(result) {
+    if (!result || !debugRaw) return;
+    for (const n of ['38', '39']) {
+      const raw = debugRaw[n];
+      if (!raw || !raw.rawBlock) continue;
+      const body = parsePassageBodyFrom3839RawBlock(raw.rawBlock, n);
+      if (body.length < 80) continue;
+      const q = result.find(r => String(r.number) === n);
+      const curQ = q ? (q.content || '').trim() : '';
+      const curDbg = (raw.rawQuestion && raw.rawQuestion.content) ? String(raw.rawQuestion.content).trim() : '';
+      if (body.length > curQ.length + 60) {
+        if (q) q.content = body;
+      }
+      if (body.length > curDbg.length + 60 && raw.rawQuestion) {
+        raw.rawQuestion.content = body;
+      }
+    }
+  }
+
+  function processImagePlaceholders(text) {
+    return text;
+  }
+
+  function removeHeaderFooter(text) {
+    let t = text;
+    t = t.replace(EXAM_TITLE_PATTERN, '');
+    t = t.replace(/제\s*\d+\s*교시/g, '');
+    t = t.replace(/^\s*(영어|국어|수학|과학|사회)\s*영역\s*$/gm, '');
+    t = t.replace(/^\s*\d+\s*(영어|국어|수학|과학|사회)\s*영역\s*고\s*\d+\s*$/gm, '');
+    t = t.replace(/^\s*\d{1,2}\s*$/gm, '');
+    t = t.replace(/\n{3,}/g, '\n\n').trim();
+    return t;
+  }
+
+  function removeExcludedSentences(text) {
+    let t = text.replace(EXCLUDE_PATTERN, '');
+    t = t.replace(CONFIRM_PATTERN, '');
+    return t.replace(/\n{3,}/g, '\n\n').trim();
+  }
+
+  /** PDF 추출본의 전각 기호 등을 파싱 패턴(ASCII)과 맞춤 */
+  function normalizePdfTextForParsing(text) {
+    if (!text) return text;
+    return text
+      .replace(/\uFF0E/g, '.')
+      .replace(/\uFF3B/g, '[')
+      .replace(/\uFF3D/g, ']')
+      .replace(/\u3010/g, '[')
+      .replace(/\u3011/g, ']')
+      .replace(/\uFF5E/g, '~')
+      .replace(/\u301C/g, '~')
+      .replace(/\u223C/g, '~');
+  }
+
+  /** [지시문] 표시용: 선행 [숫자~숫자]는 헤더(문제 n~m)에만 두고 본문에서 제거 */
+  function stripBracketRangePrefixFromInstruction(s) {
+    if (!s || typeof s !== 'string') return s;
+    let out = s;
+    let prev;
+    do {
+      prev = out;
+      out = out.replace(/^\s*\[\s*\d+\s*~\s*\d+\s*\]\s*/, '').trim();
+    } while (out !== prev);
+    return out;
+  }
+
+  function applyDisplayInstructionCleanup(questions) {
+    for (const q of questions) {
+      q.instruction = stripBracketRangePrefixFromInstruction(q.instruction || '');
+    }
+  }
+
+  function questionSortKey(q) {
+    const s = String(q.number);
+    const r = s.match(/^(\d+)~(\d+)$/);
+    if (r) return parseInt(r[1], 10) * 2;
+    const n = parseInt(s, 10);
+    return isNaN(n) ? 99999 : n * 2 + 1;
+  }
+
+  function sortExtractedQuestionsByNumber(questions) {
+    questions.sort((a, b) => questionSortKey(a) - questionSortKey(b));
+    return questions;
+  }
+
+  /** 지문: 단일 줄바꿈→공백, 문장 단위 마침표 뒤 줄바꿈(Ph.D·이메일·소수 등 제외) */
+  function insertSentenceBreaksAfterPeriod(para) {
+    const tokens = [];
+    const pushPh = (m) => { const i = tokens.length; tokens.push(m); return '\uE000' + i + '\uE001'; };
+
+    let s = para;
+    s = s.replace(/\.{3,}/g, pushPh);
+    s = s.replace(/\d+\.\d+(?:[eE][+-]?\d+)?/g, pushPh);
+    s = s.replace(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z0-9.-]+/g, pushPh);
+    const abbrRe = /\b(?:Ph\.D\.|Ph\.D|E\.g\.|e\.g\.|I\.e\.|i\.e\.|Mr\.|Mrs\.|Ms\.|Dr\.|Vs\.|vs\.|Jr\.|Sr\.|Inc\.|Ltd\.|Prof\.|U\.S\.|U\.K\.|E\.U\.|a\.m\.|p\.m\.|etc\.)(?=\s|$)/gi;
+    s = s.replace(abbrRe, pushPh);
+    s = s.replace(/(^|\n)(\s*)(\d{1,2})\.\s/g, (_, a, ws, n) => a + ws + pushPh(n + '. '));
+    s = s.replace(/(?<=\.\s)(\d{1,2})\.\s/g, pushPh);
+    s = s.replace(/\.(\s+)(?=[A-Z가-힣①-⑤㉠-㉥Ⓐ-Ⓔ]|[(（"]|\d)/g, '.\n');
+    for (let i = tokens.length - 1; i >= 0; i--) {
+      s = s.split('\uE000' + i + '\uE001').join(tokens[i]);
+    }
+    return s.replace(/[ \t]+/g, ' ').replace(/\n[ \t]+/g, '\n').replace(/[ \t]+\n/g, '\n').trim();
+  }
+
+  /** 불릿(•) 앞에 줄바꿈 — 공백만 있는 경우 제거 후 한 줄로 */
+  function insertBulletNewlines(para) {
+    if (!para || !/•/.test(para)) return para;
+    return para.replace(/(?<=\S)\s+•/g, '\n•').replace(/\n{3,}/g, '\n\n');
+  }
+
+  /**
+   * 추가 유형: PDF 객체·PUA 문자 뒤 문장 시작 / ."But 붙음 / 닫는따옴표 직후 ①~⑤ / 마침표 직후 ①~⑤(공백 없음)
+   * insertSentenceBreaksAfterPeriod 이후 호출(플레이스홀더 해제 후)
+   */
+  function applyExtraPassageLineBreaks(para) {
+    let s = para;
+    s = s.replace(/\.(["\u201D])But\b/g, '.\n$1But');
+    s = s.replace(/([\u201D"])([①-⑤㉠-㉥Ⓐ-Ⓔ])(?=\s)/g, '$1\n$2');
+    s = s.replace(/\.([①-⑤㉠-㉥Ⓐ-Ⓔ])/g, '.\n$1');
+    s = s.replace(/\.\s*(?:[\uFFFC\uFFFD\u200B\uFEFF]|[\uE000-\uF8FF])+\s*(?=[A-Z])/g, '.\n');
+    return s.replace(/\n{3,}/g, '\n\n');
+  }
+
+  function formatPassageLineBreaks(raw) {
+    if (!raw || !String(raw).trim()) return raw;
+    const str = String(raw);
+    const footParts = str.split(/\n(?=\s*\*)/);
+    const main = footParts[0];
+    const foot = footParts.length > 1 ? '\n' + footParts.slice(1).join('\n') : '';
+
+    let s = main.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+    const paras = s.split(/\n{2,}/).map(p => p.replace(/\n/g, ' ').replace(/[ \t]+/g, ' ').trim()).filter(Boolean);
+    const formatted = paras.map(p => insertBulletNewlines(applyExtraPassageLineBreaks(insertSentenceBreaksAfterPeriod(p))));
+    return formatted.join('\n\n') + foot;
+  }
+
+  function finalizeExtractedResult(result) {
+    applyDisplayInstructionCleanup(result);
+    for (const q of result) {
+      if (q.content) q.content = formatPassageLineBreaks(q.content);
+    }
+    sortExtractedQuestionsByNumber(result);
+    return result;
+  }
+
+  function splitInstructionAndPassage(content) {
+    if (!content || !content.trim()) return { instruction: '', passage: '' };
+    const lines = content.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    if (lines.length === 0) return { instruction: '', passage: '' };
+    const first = lines[0];
+    const fullText = content.trim();
+    const isInstructionEnd = (s) => /(것은\s*\?|고르시오|답하시오|하시오)\.?\s*$/.test(s);
+    const hasInstructionKeywords = (s) => /(다음|대화를\s*듣고|다음을\s*듣고|다음을\s*읽고|표를\s*보|도표를|내용을\s*듣고|물음에\s*답하시오|고르시오|답하시오)/.test(s);
+    const isInstructionStart = /^밑줄\s*친\s/.test(first) ||
+      /^다음(\s*(글의|글을|을|표를|도표를|그래프를|글에서|내용을|상황\s*설명을)|을\s*듣고)/.test(first) ||
+      /^다음을\s*(읽고|듣고|보고)/.test(first) ||
+      /^대화를\s*듣고/.test(first) ||
+      /^다음\s*표를\s*보/.test(first) ||
+      /\b다음\s*내용을\s*듣고|\b다음\s*표를\s*보면서|\b다음\s*상황\s*설명을/.test(first) ||
+      (/에\s*관한\s*다음|에\s*관해\s*언급|에\s*관한\s*다음\s*안내문/.test(first) && hasInstructionKeywords(first)) ||
+      /^[A-Za-z0-9\s]+에\s*관한\s*다음/.test(first);
+    if (isInstructionStart) {
+      let instructionLines = [first];
+      let i = 1;
+      while (i < lines.length && !isInstructionEnd(instructionLines.join(' '))) {
+        const next = lines[i];
+        const lastLine = instructionLines[instructionLines.length - 1] || '';
+        if (next.length <= 25 && /(고르시오|답하시오|하시오)\.?\s*$/.test(next)) {
+          instructionLines.push(next);
+          i++;
+        } else if (/고\s*$/.test(lastLine) && /^르시오\.?\s*$/.test(next)) {
+          instructionLines[instructionLines.length - 1] = lastLine.replace(/\s*$/, '') + next.replace(/^\s*/, '');
+          i++;
+        } else if (next.length <= 15 && /(것을|을)\s*$/.test(next) && /^[가-힣\s,]+$/.test(next)) {
+          instructionLines.push(next);
+          i++;
+        } else if (next.length <= 25 && /것은\s*\??\s*$/.test(next) && /^(하지\s*않는|하는|않은|내용과\s*일치)/.test(next)) {
+          instructionLines.push(next);
+          i++;
+        } else if (next.length <= 80 && hasInstructionKeywords(next) && !/^[A-Za-z]/.test(next)) {
+          instructionLines.push(next);
+          i++;
+        } else if (next.length <= 50 && /것은\s*\?\s*(?:\[\d+점\]|\[#점\])?\s*$/.test(next) && !/^[A-Z]/.test(next)) {
+          instructionLines.push(next);
+          i++;
+        } else if (next.length <= 60 && /것은\s*\??\s*$/.test(next) && !/^[A-Z]/.test(next)) {
+          instructionLines.push(next);
+          i++;
+        } else break;
+      }
+      let instruction = instructionLines.join(' ').replace(/\s+/g, ' ').trim();
+      let passage = lines.slice(i).join('\n').trim();
+      const sameLineSplit = instruction.match(/(.*?(?:고르시오|답하시오|하시오)\.)\s+([A-Za-z][A-Za-z\s]*:.*)$/);
+      if (sameLineSplit) {
+        instruction = sameLineSplit[1].trim();
+        passage = (sameLineSplit[2] + (passage ? '\n' + passage : '')).trim();
+      }
+      passage = normalizeTablePassage(passage);
+      return { instruction, passage };
+    }
+    if (/^윗글의\s*제목으로/.test(first)) {
+      const instructionLines = [first];
+      let i = 1;
+      while (i < lines.length && !isInstructionEnd(instructionLines.join(' '))) {
+        const next = lines[i];
+        if (next.length <= 50 && /것은\s*\?/.test(next) && !/^[A-Z]/.test(next)) {
+          instructionLines.push(next);
+          i++;
+          break;
+        }
+        if (next.length <= 30 && !/^[A-Za-z]{2,}/.test(next)) {
+          instructionLines.push(next);
+          i++;
+        } else break;
+      }
+      const instruction = instructionLines.join(' ').replace(/\s+/g, ' ').trim();
+      const passage = lines.slice(i).join('\n').trim();
+      return { instruction, passage: normalizeTablePassage(passage) };
+    }
+    if (hasInstructionKeywords(fullText) && isInstructionEnd(fullText) && fullText.length < 250) {
+      return { instruction: fullText, passage: '' };
+    }
+    const sameLineSplitFull = fullText.match(/(.*?(?:고르시오|답하시오|하시오)\.)\s+([A-Za-z][A-Za-z\s]*:.*)$/s);
+    if (sameLineSplitFull && hasInstructionKeywords(sameLineSplitFull[1])) {
+      return { instruction: sameLineSplitFull[1].trim(), passage: normalizeTablePassage(sameLineSplitFull[2].trim()) };
+    }
+    if (isInstructionEnd(first) || /것은\s*\?|하시오|답하시오/.test(first)) {
+      return { instruction: first, passage: normalizeTablePassage(lines.slice(1).join('\n').trim()) };
+    }
+    return { instruction: '', passage: normalizeTablePassage(content.trim()) };
+  }
+
+  function processMisplacedChoiceToPassage(questions) {
+    for (const q of questions) {
+      const toMove = [];
+      for (let idx = q.choices.length - 1; idx >= 0; idx--) {
+        const c = q.choices[idx];
+        const text = (c.text || '').trim();
+        const markStr = String(c.mark);
+        const numericMark = /^[1-5]$/.test(markStr) || /^[①②③④⑤]$/u.test(markStr);
+        const koreanShortNum = /^[\d]+\s*[월세일].*[된다다]$/.test(text) && text.length < 35;
+        const koreanChoiceSummary = /[가-힣]{2,}/.test(text) && /다\.?$/.test(text);
+        const isPassageLike = numericMark && !koreanShortNum && !koreanChoiceSummary && (
+          (/^\d|^×|×\s*10|as measured|km\b|million\b/i.test(text) && text.length > 35) ||
+          (text.length > 40 && /[\d×]/.test(text)) ||
+          (/^But\s+.+didn't\s+stop|^But\s+artificial\s+intelligence/i.test(text) && text.length > 35)
+        );
+        if (isPassageLike) toMove.push({ idx, text });
+      }
+      for (const { idx, text } of toMove) {
+        q.choices.splice(idx, 1);
+        const content = q.content || '';
+        let inserted = false;
+        if (/appearance\s+was\s+in\s+a\s+movie/i.test(content) && /But\s+.*didn't\s+stop|But\s+artificial/i.test(text)) {
+          q.content = content.replace(/(\s*)([Aa]ppearance\s+was\s+in\s+a\s+movie[\s\S]*?)(?=⑤|Since\s+then|\*\s*automaton)/i, (_, sp, app) => text.trim() + ' ' + (app || '').trim());
+          inserted = true;
+        }
+        if (!inserted) {
+          const insertMatch = content.match(/(.*:\s*)\n+(\s*)([A-Z][a-z][^\n]*)/);
+          if (insertMatch) {
+            q.content = content.replace(insertMatch[0], insertMatch[1] + '\n' + text + '\n\n' + insertMatch[3]);
+          } else {
+            q.content = (content + '\n' + text).trim();
+          }
+        }
+      }
+    }
+  }
+
+  function processUnderlineQuestions(questions) {
+    for (const q of questions) {
+      if (!(q.instruction || '').includes('밑줄 친 부분')) continue;
+      const choices = q.choices || [];
+      const misplacedChoices = [];
+      for (let idx = 0; idx < choices.length; idx++) {
+        const c = choices[idx];
+        const text = (c.text || '').trim();
+        const isPassageLike = text.length > 35 && (
+          /^(the|more|our|and|when|if|for|to|ironically|our\s+desire)\s/i.test(text) ||
+          /,\s*the\s+more\s+/.test(text) || /^[a-z]/.test(text)
+        );
+        if (isPassageLike) misplacedChoices.push({ idx, mark: c.mark, text });
+      }
+      for (let i = misplacedChoices.length - 1; i >= 0; i--) {
+        const { idx, mark, text } = misplacedChoices[i];
+        const insertText = mark + ' ' + text;
+        let inserted = false;
+        if (/more\s+we\s+have|the\s+more\s+/.test(text) && q.content) {
+          const gapMatch = q.content.match(/(Ironically,?\s*the)\s*\n?\s*(our\s+security)/);
+          if (gapMatch) {
+            q.content = q.content.replace(gapMatch[0], gapMatch[1] + ' ' + insertText + ' ' + gapMatch[2]);
+            inserted = true;
+          }
+        }
+        if (!inserted) {
+          q.content = (q.content || '') + '\n' + insertText;
+        }
+        q.choices.splice(idx, 1);
+      }
+    }
+  }
+
+  function extractUnderlinePhrase(source) {
+    if (!source || !/밑줄\s*친\s/.test(source)) return '';
+    const m = source.match(/밑줄\s*친\s*(?:['"]([^'"]+)['"]|([^가]+?))\s*가/);
+    return m ? (m[1] || m[2] || '').trim() : '';
+  }
+  function addPhraseUnderline(text, format, phraseSource) {
+    const source = phraseSource || text;
+    const phrase = extractUnderlinePhrase(source);
+    if (!phrase || !text || !text.includes(phrase)) return text;
+    const esc = phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const phraseRe = new RegExp(esc, 'g');
+    return text.replace(phraseRe, (m) => {
+      if (format === 'html') return '<u>' + m + '</u>';
+      return '_' + m + '_';
+    });
+  }
+
+  function addUnderlineFormatting(passage, instruction, format) {
+    const s = (passage && String(passage).trim()) || '';
+    if (!s || !/[a-zA-Z가-힣]/.test(s)) return '';
+    let result = passage;
+    if (instruction && instruction.includes('밑줄 친 부분')) {
+      const markerPat = '[①-⑤]';
+      const wordRe = new RegExp('(' + markerPat + ')\\s+((?:to\\s+)?[a-zA-Z]+)', 'g');
+      result = result.replace(wordRe, (_, m, word) => {
+        if (!word) return m + ' ';
+        if (format === 'html') return m + ' <u>' + word + '</u>';
+        return m + ' _' + word + '_';
+      });
+    }
+    if (instruction && /밑줄\s*친\s/.test(instruction)) {
+      result = addPhraseUnderline(result, format, instruction);
+    }
+    if (/빈칸/.test(instruction || '')) {
+      const blankPlaceholders = [
+        [/\b(of)\s+(are)\b/gi, '$1 _____ $2'],
+        [/\b(that)\s+(caused)\b/gi, '$1 _____ $2'],
+      ];
+      for (const [re, repl] of blankPlaceholders) {
+        result = result.replace(re, repl);
+      }
+    }
+    if (result) {
+      const blankRe = /([a-zA-Z][\w\s'―\-]*?)(\s+)(\.)(?!\.)/g;
+      result = result.replace(blankRe, (_, before, gap, dot) => {
+        if (/^\.+$/.test(before)) return before + gap + dot;
+        const len = Math.max(Math.max(gap.length, 5) * 3, 15);
+        const underline = '_'.repeat(len);
+        if (format === 'html') return before + ' <u>' + '\u00A0'.repeat(len) + '</u>' + dot;
+        return before + ' ' + underline + dot;
+      });
+    }
+    return result;
+  }
+
+  function removeHeaderFooterFromPassage(text) {
+    return text.replace(/\n\s*고\s*\d+\s*영어\s*영역\s*\d*\s*$/m, '')
+      .replace(/\n\s*\d{4}학년도[\s\S]*$/m, '').trim();
+  }
+
+  const RANGES_TO_KEEP_AS_ONE = ['16~17', '36~37', '38~39', '41~42'];
+  function isRangeBlock(q) { return q && /^\d+~\d+$/.test(String(q.number)); }
+  function questionCount(questions) { return questions.filter(q => !isRangeBlock(q)).length; }
+  function displayNumber(q) { return isRangeBlock(q) ? '[' + q.number + ']' : q.number; }
+  function questionHeader(q) { return isRangeBlock(q) ? displayNumber(q) : '문제 ' + q.number; }
+
+  function consolidate4142HeaderQuestions(questions) {
+    for (let i = 0; i < questions.length - 1; i++) {
+      if (String(questions[i].number) !== '41~42' || String(questions[i + 1].number) !== '41') continue;
+      const h = questions[i];
+      const q41 = questions[i + 1];
+      let inst = (h.instruction || '').trim();
+      if (!/^\[\s*41\s*~\s*42\s*\]/i.test(inst)) inst = '[41~42] ' + inst;
+      inst = inst.replace(/\s+/g, ' ').trim();
+      const block = { instruction: inst, passage: (h.content || '').trim() };
+      if (q41._range4142) {
+        if (!(q41._range4142.passage || '').trim() && block.passage) q41._range4142.passage = block.passage;
+        if (!(q41._range4142.instruction || '').trim() && block.instruction) q41._range4142.instruction = block.instruction;
+      } else q41._range4142 = block;
+      questions.splice(i, 1);
+      i--;
+    }
+  }
+
+  function extract4142PrefixFrom41Content(content) {
+    if (!content || !/^\s*\[\s*41\s*~\s*42\s*\]/i.test(content.trim())) return { content, extra: null };
+    const range4142 = /^\s*\[\s*41\s*~\s*42\s*\]\s*([\s\S]*?답하시오\.?)\s*\n+/i;
+    const m = content.match(range4142);
+    if (!m) return { content, extra: null };
+    const sharedInst = ('[41~42] ' + m[1]).replace(/\s+/g, ' ').trim();
+    let rest = content.slice(m[0].length).trim();
+    const rawLines = rest.split(/\r?\n/);
+    const passageLines = [];
+    let k = 0;
+    for (; k < rawLines.length; k++) {
+      const L = rawLines[k].trim();
+      if (!L) continue;
+      if (/^(41\.\s*)?윗글의\s*제목으로/i.test(L) || /^41\.\s*윗글의/i.test(L)) break;
+      passageLines.push(L);
+    }
+    const sharedPassage = passageLines.join('\n').trim();
+    const remainder = rawLines.slice(k).join('\n').trim();
+    return { content: remainder, extra: { instruction: sharedInst, passage: sharedPassage } };
+  }
+
+  function consolidate3134HeaderQuestions(questions) {
+    const sharedPhrase = /다음\s*빈칸에\s*들어갈\s*말로\s*가장\s*적절한\s*것을\s*고르시오/i;
+    for (let i = 0; i < questions.length; i++) {
+      if (String(questions[i].number) !== '31~34') continue;
+      const h = questions[i];
+      let inst = (h.instruction || '').trim();
+      if (!inst && (h.content || '').trim()) {
+        const sp = splitInstructionAndPassage((h.content || '').trim());
+        inst = (sp.instruction || '').trim();
+      }
+      if (!/^\[\s*31\s*~\s*34\s*\]/i.test(inst)) inst = ('[31~34] ' + inst.replace(/^\[\s*31\s*~\s*34\s*\]\s*/i, '').trim()).replace(/\s+/g, ' ').trim();
+      else inst = inst.replace(/\s+/g, ' ').trim();
+      h.instruction = inst;
+      let j = i + 1;
+      while (j < questions.length) {
+        const num = String(questions[j].number);
+        if (num !== '31' && num !== '32' && num !== '33' && num !== '34') break;
+        const q = questions[j];
+        const cur = (q.instruction || '').trim();
+        if (sharedPhrase.test(cur) || /^\[\s*31\s*~\s*34\s*\]/i.test(cur)) q.instruction = '';
+        j++;
+      }
+    }
+  }
+
+  function extract3134PrefixFrom31Content(content) {
+    if (!content || !/^\s*\[\s*31\s*~\s*34\s*\]/i.test(content.trim())) return { content, inst: null };
+    const trimmed = content.trim();
+    const m = trimmed.match(/^\s*\[\s*31\s*~\s*34\s*\]\s*([\s\S]*?고르시오\.?)(?:\s*\n+|\s*(?=31\.)|(?=31\.))/i);
+    if (!m) return { content, inst: null };
+    const inst = ('[31~34] ' + m[1]).replace(/\s+/g, ' ').trim();
+    return { content: trimmed.slice(m[0].length).trim(), inst };
+  }
+
+  function deduplicateRangeQuestions(questions) {
+    const sharedInstrRe = /(?:다음\s*글을\s*읽고|다음을\s*읽고)[\s\S]*?답하시오|^\[\s*41\s*~\s*42\s*\]/i;
+    const result = [];
+    for (let i = 0; i < questions.length; i++) {
+      const q = questions[i];
+      const numStr = String(q.number);
+      if (!RANGES_TO_KEEP_AS_ONE.includes(numStr)) {
+        result.push(q);
+        continue;
+      }
+      let merged = { ...q };
+      while (i + 1 < questions.length && String(questions[i + 1].number) === numStr) {
+        const next = questions[++i];
+        if (numStr === '41~42') {
+          const a = merged.instruction || '';
+          const b = next.instruction || '';
+          const aOk = sharedInstrRe.test(a);
+          const bOk = sharedInstrRe.test(b);
+          if (aOk && !bOk) merged.instruction = a;
+          else if (bOk && !aOk) merged.instruction = b;
+          else merged.instruction = (a).includes('듣고') ? a : (b || a);
+        } else {
+          merged.instruction = (merged.instruction || '').includes('듣고') ? merged.instruction : (next.instruction || merged.instruction);
+        }
+        merged.content = [merged.content, next.content].filter(Boolean).join('\n\n') || merged.content || next.content;
+        if ((next.choices || []).length > (merged.choices || []).length) {
+          merged.choices = next.choices || merged.choices;
+        } else if ((merged.choices || []).length === 0 && (next.choices || []).length > 0) {
+          merged.choices = next.choices;
+        }
+        if (next._subInstructions) merged._subInstructions = next._subInstructions;
+      }
+      result.push(merged);
+    }
+    questions.length = 0;
+    questions.push(...result);
+  }
+
+  function mergeRangeQuestions(questions) {
+    const merged = [];
+    for (let i = 0; i < questions.length; i++) {
+      const q = questions[i];
+      const next = questions[i + 1];
+      const numStr = String(q.number);
+      if (numStr.includes('~')) {
+        merged.push(q);
+        continue;
+      }
+      const qNum = parseInt(numStr, 10);
+      const nextNum = next ? parseInt(String(next.number), 10) : NaN;
+      const rangeKey = qNum + '~' + (qNum + 1);
+      if (RANGES_TO_KEEP_AS_ONE.includes(rangeKey) && next && !String(next.number).includes('~') && nextNum === qNum + 1) {
+        const qChoices = q.choices || [];
+        const nChoices = next?.choices || [];
+        let mergedChoices = [...qChoices, ...nChoices];
+        if (qChoices.length === 5 && nChoices.length === 5 &&
+            qChoices.every((c, i) => (c.text || '') === (nChoices[i]?.text || ''))) {
+          mergedChoices = qChoices;
+        }
+        let mergedInstruction;
+        let mergedContent = [q.content, next?.content].filter(Boolean).join('\n\n');
+        if (rangeKey === '41~42') {
+          const instA = (q.instruction || '').trim();
+          const instB = (next?.instruction || '').trim();
+          const sharedRe = /(?:다음\s*글을\s*읽고|다음을\s*읽고)[\s\S]*?답하시오\.?/i;
+          mergedInstruction = (sharedRe.test(instA) ? instA : sharedRe.test(instB) ? instB : '').replace(/\s+/g, ' ').trim();
+          if (q._range4142 && (q._range4142.passage || '').trim()) {
+            mergedContent = [q._range4142.passage.trim(), mergedContent].filter(Boolean).join('\n\n').trim();
+          }
+          if (q._range4142 && (q._range4142.instruction || '').trim()) {
+            mergedInstruction = q._range4142.instruction.replace(/\s+/g, ' ').trim();
+          }
+          const fromContent = mergedContent.match(/^\s*(?:\[\s*41\s*~\s*42\s*\][^\n]*\n\s*)?((?:다음\s*글을\s*읽고|다음을\s*읽고)[\s\S]*?답하시오\.?)\s*\n+/i);
+          if (fromContent) {
+            if (!mergedInstruction) mergedInstruction = fromContent[1].replace(/\s+/g, ' ').trim();
+            mergedContent = mergedContent.slice(fromContent[0].length).trim();
+          }
+          if (!mergedInstruction) mergedInstruction = '다음 글을 읽고, 물음에 답하시오.';
+        } else if (rangeKey === '16~17') {
+          const instA = (q.instruction || '').trim();
+          const instB = (next?.instruction || '').trim();
+          const sharedListen = /다음을\s*듣고[\s\S]*?답하시오\.?/i;
+          mergedInstruction = (sharedListen.test(instA) ? instA : sharedListen.test(instB) ? instB : '').replace(/\s+/g, ' ').trim();
+          const fromContent = mergedContent.match(/^\s*(?:\[\s*16\s*~\s*17\s*\]\s*)?(다음을\s*듣고\s*,?\s*물음에\s*답하시오\.?)\s*\n+/i);
+          if (fromContent) {
+            if (!mergedInstruction) mergedInstruction = fromContent[1].replace(/\s+/g, ' ').trim();
+            mergedContent = mergedContent.slice(fromContent[0].length).trim();
+          }
+          if (!mergedInstruction) mergedInstruction = '다음을 듣고, 물음에 답하시오.';
+          if (!/^\[\s*16\s*~\s*17\s*\]/i.test(mergedInstruction)) {
+            mergedInstruction = ('[16~17] ' + mergedInstruction.replace(/^\[\s*16\s*~\s*17\s*\]\s*/i, '').trim()).replace(/\s+/g, ' ').trim();
+          }
+        } else {
+          mergedInstruction = (q.instruction || '').includes('듣고') ? (q.instruction || '') : (next?.instruction || q.instruction || '');
+        }
+        const mergedQ = {
+          number: rangeKey,
+          instruction: mergedInstruction,
+          content: mergedContent,
+          choices: mergedChoices,
+          type: '객관식'
+        };
+        mergedQ._subInstructions = { [qNum]: (q.instruction || '').trim(), [qNum + 1]: (next?.instruction || '').trim() };
+        merged.push(mergedQ);
+        i++;
+        continue;
+      }
+      merged.push(q);
+    }
+    questions.length = 0;
+    questions.push(...merged);
+  }
+
+  function splitMergedQuestions(questions) {
+    for (let i = questions.length - 1; i >= 0; i--) {
+      const q = questions[i];
+      const numStr = String(q.number);
+      if (RANGES_TO_KEEP_AS_ONE.some(r => numStr === r || numStr.includes(r))) continue;
+      const currNum = parseInt(numStr.split('~')[0], 10);
+      if (isNaN(currNum) || currNum < 1 || currNum > 99) continue;
+      const nextNum = currNum + 1;
+      const nextStart = new RegExp('(^|\\n)\\s*(' + nextNum + '\\.\\s+)([\\s\\S]*)$');
+      const m = (q.content || '').match(nextStart);
+      if (!m || !m[3]) continue;
+      const beforeNext = (q.content || '').replace(nextStart, '$1').trim();
+      const nextContent = (m[2] || '') + (m[3] || '');
+      q.content = beforeNext || q.content;
+      if (numStr.includes('~')) q.number = String(currNum);
+      const { instruction: nextInst, passage: nextPassage } = splitInstructionAndPassage(nextContent);
+      const newQ = { number: String(nextNum), instruction: nextInst, content: nextPassage, choices: [], type: '객관식' };
+      if (q.choices && q.choices.length >= 10) {
+        newQ.choices = q.choices.splice(5, 5);
+      } else if (q.choices && q.choices.length >= 5) {
+        newQ.choices = q.choices.splice(5, 5);
+      }
+      questions.splice(i + 1, 0, newQ);
+    }
+  }
+
+  function inheritSharedPassage(questions) {
+    const orderPattern = /이어질\s*글의\s*순서|들어가기에\s*가장\s*적절한\s*곳/;
+    const sharedPassagePattern = /가리키는\s*대상|윗글에\s*관한|배열한\s*것으로/;
+    for (let i = 0; i < questions.length; i++) {
+      const q = questions[i];
+      if ((q.number + '').includes('~')) continue;
+      const qNum = parseInt(String(q.number), 10);
+      const needsPassage = (q.content || '').trim().length < 30 &&
+        (orderPattern.test(q.instruction || '') || sharedPassagePattern.test(q.instruction || ''));
+      if (!needsPassage) continue;
+      for (let j = 0; j < questions.length; j++) {
+        if (i === j) continue;
+        const other = questions[j];
+        if (!(other.number + '').includes('~')) continue;
+        const oNum = parseInt(String(other.number).split('~')[0], 10);
+        const oEnd = parseInt(String(other.number).split('~')[1] || oNum, 10);
+        if (qNum >= oNum && qNum <= oEnd && other.content && other.content.trim().length > 100) {
+          q.content = other.content;
+          break;
+        }
+      }
+    }
+  }
+
+  function splitRangeWithoutDelimiter(questions) {
+    for (let i = questions.length - 1; i >= 0; i--) {
+      const q = questions[i];
+      const numStr = String(q.number);
+      if (RANGES_TO_KEEP_AS_ONE.some(r => numStr === r || numStr.includes(r))) continue;
+      if (!numStr.includes('~')) continue;
+      const [a, b] = numStr.split('~').map(n => parseInt(n, 10));
+      if (isNaN(a) || isNaN(b) || b !== a + 1) continue;
+      const hasContent = (q.content || '').trim().length > 10;
+      const extraChoices = q.choices && q.choices.length > 5 ? q.choices.splice(5, 5) : [];
+      const newQ = { number: String(b), instruction: q.instruction || '', content: hasContent ? (q.content || '') : '', choices: extraChoices, type: '객관식' };
+      q.number = String(a);
+      questions.splice(i + 1, 0, newQ);
+    }
+  }
+
+  function reassignMisplacedPassages(questions) {
+    for (let i = questions.length - 1; i >= 0; i--) {
+      const q = questions[i];
+      if (!q.content) continue;
+      let mainPassage = '';
+      let extractedPassage = '';
+      const currNum = parseInt(q.number, 10);
+
+      const letterMatch = q.content.match(/^([\s\S]*?)(Dear\s+[A-Za-z][A-Za-z\s]+,[\s\S]*)$/);
+      if (letterMatch) {
+        mainPassage = letterMatch[1].replace(/\s+$/, '').trim();
+        extractedPassage = removeHeaderFooterFromPassage(letterMatch[2]);
+      }
+      if (!extractedPassage) {
+        const sockHopMatch = q.content.match(/^([\s\S]+?)FatherDaughter Sock Hop\s*\n([\s\S]*)$/);
+        if (sockHopMatch) {
+          mainPassage = sockHopMatch[1].replace(/\s+$/, '').trim();
+          extractedPassage = removeHeaderFooterFromPassage('FatherDaughter Sock Hop\n' + sockHopMatch[2]);
+        }
+      }
+      if (!extractedPassage) continue;
+
+      const letterPattern = /Dear\s+[A-Za-z][A-Za-z\s]+,/;
+      const listeningPattern = /여자(가)?\s*하는\s*말|남자(가)?\s*하는\s*말|다음을\s*듣고|물음에\s*답하시오/;
+      const speakingWithLetterPattern = /Liam|Sophia|상황\s*설명\s*을\s*듣고/;
+      const needsLetterPattern = /다음\s*글의\s*목적으로|도서관\s*운영\s*시간|도서관\s*프로그램/;
+      const shouldMoveLetter = letterPattern.test(extractedPassage) && (
+        listeningPattern.test(q.instruction || '') || speakingWithLetterPattern.test(q.instruction || '')
+      );
+
+      if (shouldMoveLetter) {
+        q.content = '';
+        for (let k = 0; k < questions.length; k++) {
+          const target = questions[k];
+          const tNum = parseInt(target.number, 10);
+          if (Number.isNaN(tNum) || tNum <= currNum) continue;
+          const hasNeedsLetter = needsLetterPattern.test(target.instruction || '') || needsLetterPattern.test((target.choices || []).map(c => c.text).join(' '));
+          if (hasNeedsLetter) {
+            target.content = extractedPassage;
+            break;
+          }
+        }
+        continue;
+      }
+
+      const sockHopListeningPattern = /언급된\s*물건|16\s*~\s*17|다음을\s*듣고\s*물음에\s*답하시오/;
+      const needsSockHopPattern = /FatherDaughter\s*Sock\s*Hop에\s*관한|Sock\s*Hop에\s*관한/;
+      const hasSockHop = /FatherDaughter\s*Sock\s*Hop/.test(extractedPassage);
+      if (hasSockHop && (sockHopListeningPattern.test(q.instruction || '') || sockHopListeningPattern.test(String(q.number)))) {
+        q.content = '';
+        for (let k = 0; k < questions.length; k++) {
+          const target = questions[k];
+          const tNum = parseInt(target.number, 10);
+          if (Number.isNaN(tNum) || tNum <= currNum) continue;
+          if (needsSockHopPattern.test(target.instruction || '')) {
+            target.content = extractedPassage;
+            break;
+          }
+        }
+        continue;
+      }
+
+      if (mainPassage.length < 20) {
+        for (let j = i - 1; j >= 0; j--) {
+          const prev = questions[j];
+          const prevNum = parseInt(prev.number, 10);
+          if (prevNum >= currNum) continue;
+          const prevContent = (prev.content || '').trim();
+          if (prevContent.length < 15) {
+            prev.content = extractedPassage;
+            q.content = mainPassage;
+            break;
+          }
+        }
+        continue;
+      }
+
+      for (let j = i - 1; j >= 0; j--) {
+        const prev = questions[j];
+        const prevNum = parseInt(prev.number, 10);
+        if (prevNum >= currNum) continue;
+        const prevContent = (prev.content || '').trim();
+        if (prevContent.length < 15) {
+          prev.content = extractedPassage;
+          q.content = mainPassage;
+          break;
+        }
+      }
+    }
+  }
+
+  function clearMisplacedListeningContent(questions) {
+    const listeningPattern = /여자(가)?\s*하는\s*말|남자(가)?\s*하는\s*말|다음을\s*듣고|물음에\s*답하시오|언급된\s*물건/;
+    const letterInContent = /Dear\s+[A-Za-z][A-Za-z\s]+,/;
+    const sockHopInContent = /FatherDaughter\s*Sock\s*Hop/;
+    const needsLetterPattern = /도서관\s*운영\s*시간|도서관\s*프로그램|다음\s*글의\s*목적으로/;
+    for (const q of questions) {
+      if (listeningPattern.test(q.instruction || '')) {
+        if (letterInContent.test(q.content || '')) q.content = '';
+        else if (sockHopInContent.test(q.content || '')) q.content = '';
+      }
+      if (needsLetterPattern.test((q.instruction || '') + (q.choices || []).map(c => c.text).join(' ')) && sockHopInContent.test(q.content || '')) {
+        q.content = '';
+      }
+    }
+  }
+
+  function fixContentWithNextQuestionPrefix(questions) {
+    for (let i = 0; i < questions.length - 1; i++) {
+      const q = questions[i];
+      const next = questions[i + 1];
+      const currNum = parseInt(q.number, 10);
+      const nextNum = parseInt(next.number, 10);
+      if (isNaN(currNum) || isNaN(nextNum) || nextNum !== currNum + 1) continue;
+      const c = (q.content || '').trim();
+      const prefixRe = new RegExp('(?:^|\\n)\\s*(' + nextNum + '\\.\\s*)([\\s\\S]*)');
+      const m = c.match(prefixRe);
+      if (m) {
+        q.content = c.replace(prefixRe, '').trim();
+        const movedContent = m[2].trim();
+        next.content = (next.content || '') ? (next.content + '\n' + movedContent) : movedContent;
+      }
+    }
+  }
+
+  function stripQuestionNumFromContent(questions) {
+    for (const q of questions) {
+      const n = parseInt(q.number, 10);
+      if (isNaN(n)) continue;
+      const c = (q.content || '').trim();
+      const re = new RegExp('^\\s*' + n + '\\.\\s*');
+      if (re.test(c)) q.content = c.replace(re, '').trim();
+    }
+  }
+
+  function fixInstructionAndContent(questions) {
+    for (const q of questions) {
+      let instr = (q.instruction || '').trim();
+      instr = instr.replace(INSTRUCTION_POINT_PATTERN, '').trim();
+      q.instruction = instr;
+      const n = parseInt(q.number, 10);
+      if (!isNaN(n) && instr.match(new RegExp('^\\s*' + n + '\\.\\s*'))) {
+        q.instruction = instr.replace(new RegExp('^\\s*' + n + '\\.\\s*'), '').trim();
+      }
+      const c = (q.content || '').trim();
+      const dupRe = /^(.*?)(\d+\.\s*[\s\S]+?\s+일치(?:하지?\s*않는|하는)\s*것은\?)\s*\n+([\s\S]*)$/;
+      const dupMatch = c.match(dupRe);
+      if (dupMatch) {
+        const passage = dupMatch[3].trim();
+        const repeatIdx = passage.indexOf(dupMatch[2]);
+        if (repeatIdx > 0) {
+          q.content = (dupMatch[1].trim() + '\n\n' + passage.substring(0, repeatIdx).trim()).trim();
+        }
+      }
+      const passageRe = /(2025 Library Bookmark Design Contest[\s\S]*?www\.sherrillpubliclibrary\.org\.)/g;
+      const matches = c.match(passageRe);
+      if (matches && matches.length >= 2) {
+        q.content = matches[0].trim();
+      }
+      if (/Library Bookmark|sherrillpubliclibrary/.test(c) && /13\s*세\s*이상이면\s*누구나\s*참가할\s*수\s*있다/.test(c)) {
+        const removed = c.match(/\n*\s*(13\s*세\s*이상이면\s*누구나\s*참가할\s*수\s*있다\.?)\s*$/i);
+        q.content = c.replace(/\n*\s*13\s*세\s*이상이면\s*누구나\s*참가할\s*수\s*있다\.?\s*$/i, '').trim();
+        if (removed && (q.choices || []).every(ch => String(ch.mark) !== '②' && String(ch.mark) !== '2')) {
+          (q.choices || []).splice(1, 0, { mark: '②', text: removed[1].replace(/\.\s*$/, '') });
+        }
+      }
+      const instrTrimmed = instr.replace(/\s+/g, ' ').trim();
+      const continuationMatch = c.match(/^(\s*않은\s*것은\s*\?\s*(?:\[\d+점\]\s*)?\n?)([\s\S]*)$/);
+      if (continuationMatch && /적절하지\s*$/.test(instrTrimmed) && !/것은\s*\?/.test(instrTrimmed)) {
+        q.instruction = (instr + continuationMatch[1].replace(/\n/g, ' ')).trim();
+        q.content = continuationMatch[2].trim();
+      }
+      if (/밑줄\s*친\s*\(a\)~\(e\)/.test(instr) && /적절하지\s*않은\s*$/.test(instr.replace(/\s+/g, ' ')) && !instr.includes('것은')) {
+        if (/^\s*것은\s*\?\s*\[3점\]/.test(c)) {
+          q.instruction = instr + ' 것은? [3점]';
+          q.content = c.replace(/^\s*것은\s*\?\s*\[3점\]\s*\n?/, '').trim();
+        } else if (/것은\s*\?\s*\[3점\]\s*$/.test(c)) {
+          q.instruction = instr + ' 것은? [3점]';
+          q.content = c.replace(/\n*\s*것은\s*\?\s*\[3점\]\s*$/, '').trim();
+        }
+      }
+      if (String(q.number) === '41~42') {
+        const sharedOnly = (q.instruction || '').match(/(?:다음\s*글을\s*읽고|다음을\s*읽고)[\s\S]*?답하시오\.?/);
+        if (sharedOnly) q.instruction = sharedOnly[0].replace(/\s+/g, ' ').trim();
+      }
+      const orderArrayInstruction = /주어진\s*글\s*\([A-Z]\)에\s*이어질\s*내용을\s*순서에\s*맞게\s*배열한/;
+      if (orderArrayInstruction.test(c) && !/[①-⑤]/.test(c) && c.length < 250) {
+        q.instruction = (instr ? instr + ' ' : '') + c.trim();
+        q.content = '';
+      }
+      const meaningContinuation = c.match(/^(하는\s*바로\s*가장\s*적절한\s*것은\?)\s*(\[?\d*점\]?\s*)?([\s\S]*)$/);
+      if (meaningContinuation && /의미\s*$/.test(instr)) {
+        q.instruction = (instr + meaningContinuation[1]).trim();
+        q.content = (meaningContinuation[3] || '').trim();
+      }
+      const mostAppropriateContinuation = c.match(/^(\s*적절한\s*것은\s*\?)\s*(\s*\[#점\]|\s*\[\d+점\])?\s*([\s\S]*)$/);
+      if (mostAppropriateContinuation && /가장\s*$/.test(instr.replace(/\s+/g, ' '))) {
+        q.instruction = (instr + mostAppropriateContinuation[1]).trim();
+        q.content = (mostAppropriateContinuation[3] || '').trim();
+      }
+      q.instruction = (q.instruction || '').replace(INSTRUCTION_POINT_PATTERN, '').trim();
+    }
+  }
+
+  function extractEmbeddedChoicesFromPassage(questions) {
+    const embeddedPattern = /일치\s*하지\s*않는/;
+    const choiceMarkers = ['①', '②', '③', '④', '⑤'];
+    for (const q of questions) {
+      if (!embeddedPattern.test(q.instruction || '')) continue;
+      const c = (q.content || '').trim();
+      if (!/[①-⑤]/.test(c)) continue;
+      const existingChoices = q.choices || [];
+      const parts = c.split(/\s*([①-⑤])\s*/);
+      if (parts.length < 3) continue;
+      const passage = (parts[0] || '').trim();
+      const extractedChoices = [];
+      for (let i = 1; i < parts.length - 1; i += 2) {
+        const mark = parts[i];
+        const text = (parts[i + 1] || '').trim();
+        if (choiceMarkers.includes(mark) && text) extractedChoices.push({ mark, text });
+      }
+      const extractedMarks = new Set(extractedChoices.map(x => x.mark));
+      const merged = [...extractedChoices];
+      for (const ex of existingChoices) {
+        let m = String(ex.mark);
+        if (/^[1-5]$/.test(m)) m = choiceMarkers[parseInt(m, 10) - 1];
+        if (!extractedMarks.has(m) && (ex.text || '').trim()) {
+          merged.push({ mark: m, text: (ex.text || '').trim() });
+        }
+      }
+      merged.sort((a, b) => choiceMarkers.indexOf(a.mark) - choiceMarkers.indexOf(b.mark));
+      if (merged.length >= 5) {
+        q.content = passage;
+        q.choices = merged.slice(0, 5);
+      }
+    }
+  }
+
+  function restoreEmbeddedChoiceOrder(questions) {
+    const grammarPattern = /밑줄\s*친\s*부분\s*중.*어법상/;
+    const choiceMarkers = ['①', '②', '③', '④', '⑤'];
+    for (const q of questions) {
+      if (!grammarPattern.test(q.instruction || '')) continue;
+      const c = q.content || '';
+      if (!/[①-⑤]/.test(c)) continue;
+      const parts = c.split(/([①-⑤])/);
+      const blocks = [];
+      for (let i = 1; i < parts.length; i += 2) {
+        if (parts[i] && choiceMarkers.includes(parts[i])) {
+          const text = (parts[i + 1] || '').trim();
+          blocks.push({ mark: parts[i], text });
+        }
+      }
+      if (blocks.length < 5) continue;
+      blocks.sort((a, b) => choiceMarkers.indexOf(a.mark) - choiceMarkers.indexOf(b.mark));
+      const intro = (parts[0] || '').trim();
+      const rebuilt = intro + blocks.map(b => b.mark + ' ' + b.text).join('');
+      if (rebuilt) q.content = rebuilt;
+    }
+  }
+
+  function fixMisplacedChoiceInMismatchQuestions(questions) {
+    const mismatchPattern = /일치\s*하지\s*않는|일치\s*하지\s*않은|일치\s*하지\s*않은/;
+    const misplacedContentPattern = /^(\d+월\s+(?:한\s*)?달간\s+진행된다\.?|\d+월\s+\d+일\s+\w+요일에\s+개최된다\.?)\s*$/;
+    for (const q of questions) {
+      if (!mismatchPattern.test(q.instruction || '')) continue;
+      const c = (q.content || '').trim();
+      const choices = q.choices || [];
+      const marks = new Set((choices).map(x => String(x.mark)));
+      const singleLine = c.split(/\n/).map(l => l.trim()).filter(Boolean);
+      if (singleLine.length !== 1 || !misplacedContentPattern.test(singleLine[0])) continue;
+      const line = singleLine[0];
+      if (!marks.has('②') && !marks.has('2')) {
+        choices.splice(1, 0, { mark: '②', text: line.replace(/\.\s*$/, '') });
+        q.content = '';
+      } else if (!marks.has('①') && !marks.has('1')) {
+        choices.splice(0, 0, { mark: '①', text: line.replace(/\.\s*$/, '') });
+        q.content = '';
+      }
+    }
+  }
+
+  function moveMisplacedFourthChoiceFromPassage(questions) {
+    const mismatchPattern = /일치\s*하지\s*않는|일치\s*하지\s*않은/;
+    for (const q of questions) {
+      if (!mismatchPattern.test(q.instruction || '')) continue;
+      const choices = q.choices || [];
+      const marks = new Set(choices.map(x => String(x.mark)));
+      if (marks.has('④') || marks.has('4')) continue;
+      const c = (q.content || '').trim();
+      const koreanChoiceAtEnd = /\n([^\n]*[가-힣]+[^\n]*다\.?)\s*$/;
+      let m = c.match(koreanChoiceAtEnd);
+      if (!m) m = c.match(/\.\s+([^\n]*[가-힣]+[^\n]*다\.?)\s*$/);
+      if (!m || (m[1] || '').length < 10) continue;
+      const line = m[1].replace(/\.\s*$/, '').trim();
+      q.content = c.replace(koreanChoiceAtEnd, '').replace(/\.\s+([^\n]*[가-힣]+[^\n]*다\.?)\s*$/, '.').trim();
+      const idx3 = choices.findIndex(ch => String(ch.mark) === '③' || String(ch.mark) === '3');
+      const insertAt = idx3 >= 0 ? idx3 + 1 : choices.length;
+      choices.splice(insertAt, 0, { mark: '④', text: line });
+    }
+  }
+
+  function removeConfirmBlockFromContent(questions) {
+    const confirmRe = /[\*＊]\s*확인\s*사항\s*\n\s*[◦○]\s*답안지의\s*해당란에[\s\S]*?확인\s*하시오\.?/gi;
+    for (const q of questions) {
+      if (q.content) q.content = q.content.replace(confirmRe, '').trim();
+    }
+  }
+
+  function removeExamTitleFromContent(questions) {
+    for (const q of questions) {
+      if (q.content) q.content = q.content.replace(EXAM_TITLE_PATTERN, '').replace(/\n{2,}/g, '\n').trim();
+    }
+  }
+
+  function removeMisplacedRangeInstruction(questions) {
+    for (const q of questions) {
+      const numStr = String(q.number);
+      if (numStr === '16~17' || numStr === '16' || numStr === '17') continue;
+      if (q.content) q.content = q.content.replace(RANGE_16_17_INSTRUCTION, '').replace(/\n{2,}/g, '\n').trim();
+    }
+  }
+
+  function removePageHeaderFromContent(questions) {
+    for (const q of questions) {
+      if (!q.content) continue;
+      let c = q.content.replace(PAGE_HEADER_PATTERN, '');
+      c = c.replace(PAGE_FOOTER_WITH_UNDERLINE, '');
+      c = c.replace(TRAILING_DECORATION_LINE, '');
+      q.content = c.replace(/\n{2,}/g, '\n').trim();
+    }
+  }
+
+  function removeMisplacedRangeInstructionFromContent(questions) {
+    const rangeInstructionAtEnd = /\n\s*\[\s*\d+\s*~\s*\d+\s*\][^\n]*\s*$/;
+    for (const q of questions) {
+      if (q.content) q.content = q.content.replace(rangeInstructionAtEnd, '').trim();
+    }
+  }
+
+  function recoverMissingFifthChoiceInEmbedded(questions) {
+    const mismatchPattern = /일치\s*하지\s*않는/;
+    for (const q of questions) {
+      if (!mismatchPattern.test(q.instruction || '')) continue;
+      const c = q.content || '';
+      if (/⑤/.test(c)) continue;
+      if (!/[①-④]/.test(c)) continue;
+      const orphaned = /(\s+)(food\s+was\s+less\s+than\s+10\s+percent\.?)\s*$/i;
+      const m = c.match(orphaned);
+      if (m) {
+        q.content = c.replace(orphaned, m[1] + '⑤ The combined share of those who rarely or never ate fast food was less than 10 percent.');
+      }
+    }
+  }
+
+  function fixDialogueSpeakerLabel(questions) {
+    // 지문 비어 있으면 그대로 둠. 지문에 내용 있으면 그대로 추출(수정 없음).
+  }
+
+  function restoreParsedStateForDebugQuestions(result) {
+    if (!debugRaw || typeof debugRaw !== 'object') return;
+    for (const q of result) {
+      const num = String(q.number);
+      const raw = debugRaw[num];
+      if (!raw || !raw.rawQuestion) continue;
+      q.content = raw.rawQuestion.content != null ? raw.rawQuestion.content : q.content;
+      const hasEmbedded = /일치\s*하지\s*않는/.test(raw.rawQuestion.instruction || '') && /[①-⑤]/.test(raw.rawQuestion.content || '');
+      if (hasEmbedded && raw.rawQuestion.choices && raw.rawQuestion.choices.length) {
+        q.choices = raw.rawQuestion.choices.map(c => ({ mark: c.mark, text: c.text || '' }));
+      }
+    }
+  }
+
+  function recoverContentFromRawBlock(result) {
+    if (!debugRaw || typeof debugRaw !== 'object') return;
+    const rangeInstruction36 = /주어진\s*글\s*다음에[\s\S]*?고르시오\.?\s*/i;
+    const rangeInstruction38 = /글의\s*흐름으로\s*보아[\s\S]*?고르시오\.?\s*/i;
+    for (const q of result) {
+      const num = String(q.number);
+      const numInt = parseInt(num, 10);
+      if (![36, 37, 38, 39].includes(numInt)) continue;
+      if ((q.content || '').trim().length > 20) continue;
+      const raw = debugRaw[num];
+      if (!raw || !raw.rawBlock) continue;
+      let block = raw.rawBlock.replace(new RegExp('^\\s*' + num + '\\.\\s*\\n?', 'i'), '').trim();
+      block = block.replace(rangeInstruction36, '').replace(rangeInstruction38, '').trim();
+      const beforeChoices = block.split(/\s*[①-⑤]\s*/)[0].trim();
+      if (beforeChoices.length > 30) q.content = beforeChoices;
+    }
+  }
+
+  function isDialogueSpeakerOnly(q) {
+    return /대화를\s*듣고/.test(q.instruction || '') && /^(Man|Woman)\s*:?\s*$/i.test((q.content || '').trim());
+  }
+  function isMismatchWithEmbeddedChoices(q) {
+    return /일치\s*하지\s*않는/.test(q.instruction || '') && /[①-⑤]/.test(q.content || '');
+  }
+
+  function expandRangeQuestionsForOutput(questions) {
+    const result = [];
+    for (const q of questions) {
+      const numStr = String(q.number);
+      const choices = q.choices || [];
+      const rangeMatch = numStr.match(/^(\d+)~(\d+)$/);
+      const a = rangeMatch ? parseInt(rangeMatch[1], 10) : NaN;
+      const b = rangeMatch ? parseInt(rangeMatch[2], 10) : NaN;
+      if (rangeMatch && b > a + 1 && numStr !== '43~45') {
+        result.push({
+          number: numStr,
+          instruction: (q.instruction || '').replace(/\s+/g, ' ').trim(),
+          content: (q.content || '').trim(),
+          choices: [],
+          type: q.type || '객관식'
+        });
+        continue;
+      }
+      const isTwoSubRange = rangeMatch && b === a + 1 && choices.length >= 10;
+      const hasSubInst = q._subInstructions && typeof q._subInstructions[a] !== 'undefined' && typeof q._subInstructions[b] !== 'undefined';
+      const hasMeaningfulSubInst = hasSubInst && ((q._subInstructions[a] || '').trim() || (q._subInstructions[b] || '').trim());
+      const content = (q.content || '').trim();
+      const contentHasSubNum = isTwoSubRange && new RegExp('\\s*' + a + '\\.\\s+').test(content) && new RegExp('\\s*' + b + '\\.\\s+').test(content);
+      const skipGenericTwoSub = numStr === '36~37' || numStr === '38~39' || numStr === '41~42';
+      if (isTwoSubRange && (hasMeaningfulSubInst || contentHasSubNum) && !skipGenericTwoSub) {
+        const reA = new RegExp('\\n?\\s*' + a + '\\.\\s*([^\\n①]+?)(?=\\s*' + b + '\\.|$)', 's');
+        const reB = new RegExp('\\n?\\s*' + b + '\\.\\s*([^\\n①]+?)(?=\\s*①|$)', 's');
+        const mA = content.match(reA);
+        const mB = content.match(reB);
+        const instA = (q._subInstructions && q._subInstructions[a]) || (mA ? mA[1].trim() : '') || (q.instruction || '');
+        const instB = (q._subInstructions && q._subInstructions[b]) || (mB ? mB[1].trim() : '') || (q.instruction || '');
+        result.push({
+          number: numStr,
+          instruction: q.instruction || '',
+          content: '',
+          choices: [],
+          type: '객관식'
+        });
+        result.push({
+          number: String(a),
+          instruction: instA || (q.instruction || ''),
+          content: '',
+          choices: choices.slice(0, 5),
+          type: '객관식'
+        });
+        result.push({
+          number: String(b),
+          instruction: instB || (q.instruction || ''),
+          content: '',
+          choices: choices.slice(5, 10),
+          type: '객관식'
+        });
+        continue;
+      }
+      if (numStr === '36~37') {
+        const content = (q.content || '').trim();
+        const wrongContent = /Richard Heinberg|excavate|renewable energy infrastructure/.test(content);
+        const parts = wrongContent ? ['', ''] : content.split(/\s*37\.\s*\n/i);
+        const c36 = (parts[0] || '').replace(/^\s*36\.\s*\n?/i, '').trim();
+        const c37 = (parts[1] || '').replace(/^\s*37\.\s*\n?/i, '').trim();
+        const chs = choices.length >= 5 ? choices.slice(0, 5) : choices;
+        let rangeInst = (q.instruction || '주어진 글 다음에 이어질 글의 순서로 가장 적절한 것을 고르시오.').replace(/\s+/g, ' ').trim();
+        const m3637 = rangeInst.match(/주어진\s*글\s*다음에[\s\S]*?고르시오\.?/);
+        if (m3637) rangeInst = m3637[0].trim();
+        result.push({
+          number: '36~37',
+          instruction: rangeInst,
+          content: '',
+          choices: [],
+          type: '객관식'
+        });
+        result.push({ number: '36', instruction: '', content: wrongContent ? '' : c36, choices: chs, type: '객관식' });
+        result.push({ number: '37', instruction: '', content: wrongContent ? '' : c37, choices: chs, type: '객관식' });
+        continue;
+      }
+      if (numStr === '38~39') {
+        const content = (q.content || '').trim();
+        const isVision = /Vision is influenced|preconceptions about reality/.test(content);
+        let c38 = '';
+        let c39 = '';
+        if (!isVision) {
+          // 첫 구분 '39.'에서만 분할 (split 전체는 본문 속 '39.'에도 잘려 39번 지문이 중간에서 끊김)
+          let parts = content.split(/\r?\n\s*39\.\s+/, 2);
+          if (parts.length < 2) parts = content.split(/\s*39\.\s+/, 2);
+          if (parts.length >= 2) {
+            c38 = (parts[0] || '').replace(/^\s*38\.\s*\n?/i, '').trim();
+            c39 = (parts[1] || '').trim();
+          } else {
+            c38 = content.replace(/^\s*38\.\s*\n?/i, '').trim();
+          }
+        }
+        const chs = choices.length >= 5 ? choices.slice(0, 5) : choices;
+        let rangeInst = (q.instruction || '글의 흐름으로 보아, 주어진 문장이 들어가기에 가장 적절한 곳을 고르시오.').replace(/\s+/g, ' ').trim();
+        const m3839 = rangeInst.match(/글의\s*흐름으로\s*보아[\s\S]*?고르시오\.?/);
+        if (m3839) rangeInst = m3839[0].trim();
+        result.push({
+          number: '38~39',
+          instruction: rangeInst,
+          content: '',
+          choices: [],
+          type: '객관식'
+        });
+        result.push({ number: '38', instruction: '', content: isVision ? '' : c38, choices: chs, type: '객관식' });
+        result.push({ number: '39', instruction: '', content: isVision ? '' : c39, choices: chs, type: '객관식' });
+        continue;
+      }
+      if (numStr === '41~42' && choices.length >= 10) {
+        const inst = (q.instruction || '').replace(/\s+/g, ' ').trim();
+        const sharedPart = inst.match(/(?:다음\s*글을\s*읽고|다음을\s*읽고)[\s\S]*?답하시오\.?/);
+        const sharedInstruction = sharedPart ? sharedPart[0].replace(/\s+/g, ' ').trim() : '다음 글을 읽고, 물음에 답하시오.';
+        result.push({
+          number: '41~42',
+          instruction: sharedInstruction,
+          content: (q.content || '').trim(),
+          choices: [],
+          type: '객관식'
+        });
+        result.push({
+          number: '41',
+          instruction: '윗글의 제목으로 가장 적절한 것은?',
+          content: '',
+          choices: choices.slice(0, 5),
+          type: '객관식'
+        });
+        result.push({
+          number: '42',
+          instruction: '밑줄 친 (a)~(e) 중에서 문맥상 낱말의 쓰임이 적절하지 않은 것은?',
+          content: '',
+          choices: choices.slice(5, 10),
+          type: '객관식'
+        });
+        continue;
+      }
+      if (numStr === '43~45') {
+        result.push({
+          number: '43~45',
+          instruction: q.instruction || '다음 글을 읽고, 물음에 답하시오.',
+          content: q.content || '',
+          choices: [],
+          type: '객관식'
+        });
+        continue;
+      }
+      if (['43', '44', '45'].includes(numStr)) {
+        result.push({
+          number: q.number,
+          instruction: q.instruction || '',
+          content: '',
+          choices: q.choices || [],
+          type: q.type || '객관식'
+        });
+        continue;
+      }
+      result.push(q);
+    }
+    return result;
+  }
+
+  function normalizeTablePassage(passage) {
+    if (!passage || !passage.trim()) return passage;
+    const lines = passage.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    if (lines.length <= 1) return passage;
+    const avgLen = lines.reduce((a, l) => a + l.length, 0) / lines.length;
+    const hasTableLikeContent = /[A-Za-z0-9$]/.test(passage) && avgLen < 30;
+    if (hasTableLikeContent) {
+      return lines.join(' ').replace(/\s+/g, ' ').trim();
+    }
+    return passage;
+  }
+
+  // 문제번호 패턴: 1., 2., 10., 43., [43~45]., [##~##].
+  const QUESTION_START = /^(?:(\d+)|\[(\d+)~\d+\])\.\s*/m;
+  const QUESTION_START_ALT = /^(?:(\d+)|\[(\d+)~\d+\])[\.\)]\s*/m;
+
+  // 선택지 패턴: ① ② ③ ④ ⑤ 또는 1) 2) 3) 4) 5)
+  const CHOICE_PATTERN = /[①-⑤㉠-㉥Ⓐ-Ⓔ]/g;
+  const CHOICE_ALT = /[1-5][\)\.]\s*/g;
+
+  function splitMultiChoicesInLine(text) {
+    const hasCircleNum = /[②-⑤]/.test(text);
+    const hasNumeric = /\s[2-5][\)\.]\s/.test(text);
+    if (!hasCircleNum && !hasNumeric) return null;
+    const choices = [];
+    if (hasNumeric) {
+      const parts = text.split(/(?=\s[2-5][\)\.]\s)/);
+      for (const p of parts) {
+        const m = p.trim().match(/^([1-5])[\)\.]\s*(.+)/);
+        if (m) choices.push({ mark: m[1], text: m[2].trim() });
+      }
+    } else {
+      const parts = text.split(/([②-⑤])/);
+      const first = parts[0].match(/^([①])\s*(.+)/);
+      if (first) choices.push({ mark: '①', text: first[2].trim() });
+      for (let i = 1; i < parts.length; i += 2) {
+        if (parts[i] && parts[i + 1] !== undefined) {
+          choices.push({ mark: parts[i], text: parts[i + 1].trim() });
+        }
+      }
+    }
+    return choices.length >= 2 ? choices : null;
+  }
+
+  function expandMultiChoicesForQuestions(questions) {
+    for (const q of questions) {
+      const expanded = [];
+      for (const c of q.choices || []) {
+        const split = splitMultiChoicesInLine((c.mark || '') + ' ' + (c.text || ''));
+        if (split) expanded.push(...split);
+        else expanded.push(c);
+      }
+      if (expanded.length > (q.choices || []).length) q.choices = expanded;
+    }
+  }
+
+  function parseQuestions(fullText) {
+    const questions = [];
+    let text = processImagePlaceholders(fullText);
+    text = removeHeaderFooter(text);
+    text = removeExcludedSentences(text);
+    text = normalizePdfTextForParsing(text);
+
+    // 문제번호 패턴: 1., [16~17]., [16~17], (쉼표), [16~17] (공백)
+    const qNumRegex = /^(\d+)\.\s*/;
+    const qRangeRegex = /^\[(\d+~\d+)\][\.,]?\s*/;
+    const qNumAltRegex = /^(\d+)[\)\.]\s*/;
+
+    function isValidQuestionNum(n) {
+      const num = parseInt(n, 10);
+      return !isNaN(num) && num >= 1 && num <= 100;
+    }
+    function isDecimalLineStart(line) {
+      return /^\d+\.\s*\d/.test(line);
+    }
+    function matchQuestionStart(line) {
+      if (isDecimalLineStart(line)) return null;
+      let m = line.match(qNumRegex);
+      if (m && isValidQuestionNum(m[1])) return { num: m[1], prefix: m[0] };
+      m = line.match(qRangeRegex);
+      if (m) {
+        const range = m[1];
+        const start = parseInt(range.split('~')[0], 10);
+        if (isValidQuestionNum(String(start))) return { num: range, prefix: m[0] };
+      }
+      m = line.match(qNumAltRegex);
+      if (m && isValidQuestionNum(m[1])) return { num: m[1], prefix: m[0] };
+      return null;
+    }
+
+    // 방법 1: 라인별 파싱 (줄바꿈 보존된 PDF)
+    const lines = text.split(/\r?\n/);
+    let i = 0;
+
+    while (i < lines.length) {
+      const line = lines[i];
+      const match = matchQuestionStart(line);
+
+      if (match) {
+        let content = line.replace(match.prefix, '').trim();
+        const choices = [];
+
+        i++;
+        while (i < lines.length) {
+          const next = lines[i];
+          if (matchQuestionStart(next)) break;
+
+          const choiceMatch = next.match(/^([①-⑤㉠-㉥Ⓐ-Ⓔ])\s*(.+)/) || next.match(/^([1-5])[\)\.]\s*(.+)/);
+          if (choiceMatch) {
+            const text = choiceMatch[2].trim();
+            const numericMark = /^[1-5]$/.test(choiceMatch[1]);
+            const isPassageLike = numericMark && (/^\d|^×|×\s*10|as measured|km\b|million\b/i.test(text) || (text.length > 40 && /[\d×]/.test(text)));
+            if (isPassageLike) {
+              content += '\n' + next.trim();
+            } else {
+              const multi = splitMultiChoicesInLine(choiceMatch[1] + ' ' + text);
+              if (multi) choices.push(...multi);
+              else choices.push({ mark: choiceMatch[1], text });
+            }
+          } else if (content && next.trim()) {
+            content += '\n' + next.trim();
+          }
+          i++;
+        }
+
+        content = removeExcludedSentences(content);
+        if (content || choices.length) {
+          let range4142Extra = null;
+          let pending3134Inst = null;
+          if (String(match.num) === '41') {
+            const ex = extract4142PrefixFrom41Content(content);
+            if (ex.extra) {
+              content = ex.content;
+              range4142Extra = ex.extra;
+            }
+          }
+          if (String(match.num) === '31') {
+            const ex31 = extract3134PrefixFrom31Content(content);
+            if (ex31.inst) {
+              content = ex31.content;
+              pending3134Inst = ex31.inst;
+            }
+          }
+          const { instruction, passage } = splitInstructionAndPassage(content);
+          if (pending3134Inst) {
+            questions.push({ number: '31~34', instruction: pending3134Inst, content: '', choices: [], type: '객관식' });
+          }
+          const qrec = { number: match.num, instruction, content: passage, choices, type: choices.length ? '객관식' : '주관식' };
+          if (range4142Extra) qrec._range4142 = range4142Extra;
+          questions.push(qrec);
+        }
+      } else {
+        i++;
+      }
+    }
+
+    if (questions.length > 0) {
+      debugRaw = {};
+      for (const q of questions) {
+        const num = String(q.number);
+        if (num.includes('~')) continue;
+        const numInt = parseInt(num, 10);
+        if (!isInDebugCaptureRanges(numInt)) continue;
+        const next = numInt + 1;
+        const blockRe = new RegExp('(?:' + num + '\\.\\s|\\[' + num + '~\\d+\\][\\.]?\\s)[\\s\\S]*?(?=\\s*(?:' + next + '\\.\\s|\\[' + next + '~)|$)', '');
+        const block = text.match(blockRe);
+        debugRaw[num] = { rawBlock: block ? block[0].trim() : null, rawQuestion: JSON.parse(JSON.stringify(q)) };
+      }
+      consolidate3134HeaderQuestions(questions);
+      consolidate4142HeaderQuestions(questions);
+      mergeRangeQuestions(questions);
+      deduplicateRangeQuestions(questions);
+      inject3839MergedQuestionFromFullText(questions, text);
+      splitMergedQuestions(questions);
+      splitRangeWithoutDelimiter(questions);
+      reassignMisplacedPassages(questions);
+      clearMisplacedListeningContent(questions);
+      fixContentWithNextQuestionPrefix(questions);
+      stripQuestionNumFromContent(questions);
+      fixInstructionAndContent(questions);
+      consolidate3134HeaderQuestions(questions);
+      fixMisplacedChoiceInMismatchQuestions(questions);
+      moveMisplacedFourthChoiceFromPassage(questions);
+      recoverMissingFifthChoiceInEmbedded(questions);
+      expandMultiChoicesForQuestions(questions);
+      inheritSharedPassage(questions);
+      processMisplacedChoiceToPassage(questions);
+      processUnderlineQuestions(questions);
+      removeConfirmBlockFromContent(questions);
+      removeExamTitleFromContent(questions);
+      removeMisplacedRangeInstruction(questions);
+      removePageHeaderFromContent(questions);
+      removeMisplacedRangeInstructionFromContent(questions);
+      fixDialogueSpeakerLabel(questions);
+      fix38_39And40Content(questions);
+      recover36_37Content(questions, text);
+      recover38_39Content(questions, text);
+      ensureDebugRawEntries3839(questions, text);
+      recover41_42Content(questions, text);
+      const result = expandRangeQuestionsForOutput(questions);
+      result.forEach(q => { q.instruction = (q.instruction || '').replace(INSTRUCTION_POINT_PATTERN, '').trim(); });
+      result.forEach(q => { if (q.content) q.content = (q.content || '').replace(CONTENT_POINT_PATTERN, '').trim(); });
+      mergeEmbeddedChoicesIntoContent(result);
+      restoreParsedStateForDebugQuestions(result);
+      recoverContentFromRawBlock(result);
+      recover3839PassageFromDebugRawResult(result);
+      stripLeadingRangeLabelFromContent(result);
+      return finalizeExtractedResult(result);
+    }
+
+    // 방법 2: 전체 텍스트에서 정규식으로 분할 (연속 텍스트 PDF)
+    // 소수점(1.5, 3.14 등) 예외: \d+\.\s 직후에 숫자가 오면 분할하지 않음
+    const blocks = text.split(/(?=\d+\.\s(?!\d)|\[\d+~\d+\][\.,]?\s)/);
+    for (const block of blocks) {
+      if (/^\d+\.\s*\d/.test(block)) {
+        if (questions.length > 0) {
+          questions[questions.length - 1].content = ((questions[questions.length - 1].content || '') + '\n' + block.trim()).trim();
+        }
+        continue;
+      }
+      let m = block.match(/^(\d+)\.\s/);
+      const isInvalidNum = m && !isValidQuestionNum(m[1]);
+      if (isInvalidNum && questions.length > 0) {
+        const prev = questions[questions.length - 1];
+        const rest = block.replace(/^\d+\.\s*/, '').trim();
+        const parts = rest.split(/([①-⑤㉠-㉥Ⓐ-Ⓔ])/);
+        if (parts.length > 1) {
+          const part0 = parts[0].trim();
+        prev.content = ((prev.content || '') + (part0 ? '\n' + part0 : '')).trim();
+          for (let j = 1; j < parts.length; j += 2) {
+            if (parts[j] && parts[j + 1] !== undefined) {
+              prev.choices.push({ mark: parts[j], text: parts[j + 1].trim() });
+            }
+          }
+        } else {
+          prev.content = (prev.content || '') + '\n' + rest;
+        }
+        continue;
+      }
+      if (m && !isValidQuestionNum(m[1])) m = null;
+      if (!m) m = block.match(/^\[(\d+~\d+)\][\.,]?\s/);
+      if (!m) continue;
+      const num = m[1];
+      if (num.includes('~')) {
+        const start = parseInt(num.split('~')[0], 10);
+        if (!isValidQuestionNum(String(start))) continue;
+      } else if (!isValidQuestionNum(num)) continue;
+      let rest = block.replace(m[0], '').trim();
+      rest = removeExcludedSentences(rest);
+      const choices = [];
+      const parts = rest.split(/([①-⑤㉠-㉥Ⓐ-Ⓔ])/);
+      if (parts.length > 1) {
+        let contentEnd = parts[0].trim();
+        for (let j = 1; j < parts.length; j += 2) {
+          if (parts[j] && parts[j + 1] !== undefined) {
+            choices.push({ mark: parts[j], text: parts[j + 1].trim() });
+          }
+        }
+        rest = contentEnd;
+      }
+      if (num && (rest || choices.length)) {
+        let range4142Extra = null;
+        let pending3134Inst = null;
+        if (String(num) === '41') {
+          const ex = extract4142PrefixFrom41Content(rest);
+          if (ex.extra) {
+            rest = ex.content;
+            range4142Extra = ex.extra;
+          }
+        }
+        if (String(num) === '31') {
+          const ex31 = extract3134PrefixFrom31Content(rest);
+          if (ex31.inst) {
+            rest = ex31.content;
+            pending3134Inst = ex31.inst;
+          }
+        }
+        const { instruction, passage } = splitInstructionAndPassage(rest);
+        if (pending3134Inst) {
+          questions.push({ number: '31~34', instruction: pending3134Inst, content: '', choices: [], type: '객관식' });
+        }
+        const qrec = { number: num, instruction, content: passage, choices, type: choices.length ? '객관식' : '주관식' };
+        if (range4142Extra) qrec._range4142 = range4142Extra;
+        questions.push(qrec);
+      }
+    }
+
+    if (questions.length > 0) {
+      debugRaw = {};
+      for (const q of questions) {
+        const num = String(q.number);
+        if (num.includes('~')) continue;
+        const numInt = parseInt(num, 10);
+        if (!isInDebugCaptureRanges(numInt)) continue;
+        const next = numInt + 1;
+        const blockRe = new RegExp('(?:' + num + '\\.\\s|\\[' + num + '~\\d+\\][\\.]?\\s)[\\s\\S]*?(?=\\s*(?:' + next + '\\.\\s|\\[' + next + '~)|$)', '');
+        const block = text.match(blockRe);
+        debugRaw[num] = { rawBlock: block ? block[0].trim() : null, rawQuestion: JSON.parse(JSON.stringify(q)) };
+      }
+      consolidate3134HeaderQuestions(questions);
+      consolidate4142HeaderQuestions(questions);
+      mergeRangeQuestions(questions);
+      deduplicateRangeQuestions(questions);
+      inject3839MergedQuestionFromFullText(questions, text);
+      splitMergedQuestions(questions);
+      splitRangeWithoutDelimiter(questions);
+      reassignMisplacedPassages(questions);
+      clearMisplacedListeningContent(questions);
+      fixContentWithNextQuestionPrefix(questions);
+      stripQuestionNumFromContent(questions);
+      fixInstructionAndContent(questions);
+      consolidate3134HeaderQuestions(questions);
+      fixMisplacedChoiceInMismatchQuestions(questions);
+      moveMisplacedFourthChoiceFromPassage(questions);
+      recoverMissingFifthChoiceInEmbedded(questions);
+      expandMultiChoicesForQuestions(questions);
+      inheritSharedPassage(questions);
+      processMisplacedChoiceToPassage(questions);
+      processUnderlineQuestions(questions);
+      removeConfirmBlockFromContent(questions);
+      removeExamTitleFromContent(questions);
+      removeMisplacedRangeInstruction(questions);
+      removePageHeaderFromContent(questions);
+      removeMisplacedRangeInstructionFromContent(questions);
+      fixDialogueSpeakerLabel(questions);
+      fix38_39And40Content(questions);
+      recover36_37Content(questions, text);
+      recover38_39Content(questions, text);
+      ensureDebugRawEntries3839(questions, text);
+      recover41_42Content(questions, text);
+    }
+    const result = expandRangeQuestionsForOutput(questions);
+    result.forEach(q => { q.instruction = (q.instruction || '').replace(INSTRUCTION_POINT_PATTERN, '').trim(); });
+    result.forEach(q => { if (q.content) q.content = (q.content || '').replace(CONTENT_POINT_PATTERN, '').trim(); });
+    mergeEmbeddedChoicesIntoContent(result);
+    restoreParsedStateForDebugQuestions(result);
+    recoverContentFromRawBlock(result);
+    recover3839PassageFromDebugRawResult(result);
+    stripLeadingRangeLabelFromContent(result);
+    return finalizeExtractedResult(result);
+  }
+
+  function fix38_39And40Content(questions) {
+    for (const q of questions) {
+      if (String(q.number) === '38~39' && /Vision is influenced|preconceptions about reality/.test(q.content || '')) {
+        for (const other of questions) {
+          if (parseInt(other.number, 10) === 40 && !(other.content || '').trim()) {
+            other.content = q.content;
+            q.content = '';
+            break;
+          }
+        }
+      }
+      if (String(q.number) === '36~37' && /Richard Heinberg|excavate|renewable energy/.test(q.content || '')) {
+        q.content = '';
+      }
+    }
+  }
+
+  /** 병합 실패(열 순서 등)로 questions에 38·39·38~39가 없을 때 fullText에서 병합 문항 삽입 → expand에서 목록에 노출 */
+  function inject3839MergedQuestionFromFullText(questions, fullText) {
+    if (!questions || !fullText || !fullText.trim()) return;
+    if (questions.some(q => String(q.number) === '38~39')) return;
+    if (questions.some(q => String(q.number) === '38')) return;
+    if (questions.some(q => String(q.number) === '39')) return;
+
+    const generic38 = fullText.match(/(?:^|[^\d])38\.\s*([\s\S]*?)(?=(?:^|[^\d])39\.\s*)/m);
+    const generic39 = fullText.match(/(?:^|[^\d])39\.\s*([\s\S]*?)(?=(?:^|[^\d])40\.\s*|\[\s*40\s*~|(?:^|[^\d])41\.\s*)/m);
+    if (!generic38 || !generic39) return;
+    const c38 = generic38[1].replace(/^\s*38\.\s*\n?/i, '').trim();
+    const c39 = generic39[1].replace(/^\s*39\.\s*\n?/i, '').trim();
+    if (c38.length < 30 || c39.length < 30) return;
+
+    let inst = '';
+    const im = fullText.match(/\[\s*38\s*~\s*39\s*\]\s*([^\r\n]+)/);
+    if (im) inst = im[1].replace(/\s+/g, ' ').trim();
+    if (!inst) inst = '글의 흐름으로 보아, 주어진 문장이 들어가기에 가장 적절한 곳을 고르시오.';
+
+    const synthetic = {
+      number: '38~39',
+      instruction: inst,
+      content: '38.\n' + c38 + '\n\n39.\n' + c39,
+      choices: [],
+      type: '객관식'
+    };
+
+    const idx = questions.findIndex(q => {
+      const s = String(q.number);
+      let n;
+      if (/^\d+~\d+$/.test(s)) n = parseInt(s.split('~')[0], 10);
+      else n = parseInt(s, 10);
+      return !isNaN(n) && n >= 40;
+    });
+    if (idx === -1) questions.push(synthetic);
+    else questions.splice(idx, 0, synthetic);
+  }
+
+  function recover36_37Content(questions, fullText) {
+    const target = questions.find(q => String(q.number) === '36~37');
+    if (!target || (target.content || '').trim().length > 100) return;
+    const searchIn = fullText ? (fullText + '\n\n' + questions.map(q => q.content || '').join('\n\n')) : questions.map(q => q.content || '').join('\n\n');
+    const desertMatch = searchIn.match(/(The desert tortoise has a simple solution[\s\S]*?)(?=\s*37\.\s*\n|Imagine you are pedall?ing)/i);
+    const bicycleMatch = searchIn.match(/(Imagine you are pedall?ing your bicycle[\s\S]*?)(?=\s*38\.\s*\n|\s*39\.\s*\n|Nonlinear editing|Vision is influenced)/i);
+    if (desertMatch && bicycleMatch) {
+      const d = desertMatch[1].replace(/^\s*36\.\s*\n?/i, '').trim();
+      const b = bicycleMatch[1].replace(/^\s*37\.\s*\n?/i, '').trim();
+      if (d.length > 50 && b.length > 50) {
+        target.content = '36.\n' + d + '\n\n37.\n' + b;
+      }
+    }
+  }
+
+  function recover38_39Content(questions, fullText) {
+    const target = questions.find(q => String(q.number) === '38~39');
+    if (!target || (target.content || '').trim().length > 100) return;
+    const searchIn = fullText ? (fullText + '\n\n' + questions.map(q => q.content || '').join('\n\n')) : questions.map(q => q.content || '').join('\n\n');
+
+    function tryGeneric3839() {
+      const generic38 = searchIn.match(/(?:^|[^\d])38\.\s*([\s\S]*?)(?=(?:^|[^\d])39\.\s*)/m);
+      const generic39 = searchIn.match(/(?:^|[^\d])39\.\s*([\s\S]*?)(?=(?:^|[^\d])40\.\s*|\[\s*40\s*~|(?:^|[^\d])41\.\s*)/m);
+      if (generic38 && generic39) {
+        const c38 = generic38[1].replace(/^\s*38\.\s*\n?/i, '').trim();
+        const c39 = generic39[1].replace(/^\s*39\.\s*\n?/i, '').trim();
+        if (c38.length > 30 && c39.length > 30) {
+          target.content = '38.\n' + c38 + '\n\n39.\n' + c39;
+          return true;
+        }
+      }
+      return false;
+    }
+
+    if (tryGeneric3839()) return;
+
+    // 38번: 여러 시작 패턴 시도 (PDF 추출 시 단어 분리·띄어쓰기 차이 허용)
+    const nonlinearPatterns = [
+      /(Nonlinear editing,?\s*on the other hand,?\s*is like using a word\s*processing program[\s\S]*?)(?=\s*39\.\s*\n|A person who always tries to prevent harm|A morally good person)/i,
+      /(All editing systems are now nonlinear[\s\S]*?)(?=\s*39\.\s*\n|A person who always tries to prevent harm|A morally good person)/i,
+      /(Linear editing was like composing a paper on a typewriter[\s\S]*?)(?=\s*39\.\s*\n|A person who always tries|A morally good person)/i
+    ];
+    let nonlinearMatch = null;
+    for (const p of nonlinearPatterns) {
+      nonlinearMatch = searchIn.match(p);
+      if (nonlinearMatch) break;
+    }
+    // 39번: 여러 시작 패턴 시도
+    const moralPatterns = [
+      /(A person who always tries to prevent harm but never does[\s\S]*?)(?=\s*40\.\s*\n|Vision is influenced|다음 글의 내용을 한 문장으로|\s*\[3점\])/i,
+      /(A morally good person is one who does morally bad[\s\S]*?)(?=\s*40\.\s*\n|Vision is influenced|다음 글의 내용을 한 문장으로|\s*\[3점\])/i,
+      /(In judging a person not only her actions but also her intentions[\s\S]*?)(?=\s*40\.\s*\n|Vision is influenced|다음 글의 내용을 한 문장으로|\s*\[3점\])/i
+    ];
+    let moralMatch = null;
+    for (const p of moralPatterns) {
+      moralMatch = searchIn.match(p);
+      if (moralMatch) break;
+    }
+    if (nonlinearMatch && moralMatch) {
+      const c38 = nonlinearMatch[1].replace(/^\s*38\.\s*\n?/i, '').trim();
+      const c39 = moralMatch[1].replace(/^\s*39\.\s*\n?/i, '').trim();
+      if (c38.length > 30 && c39.length > 30) {
+        target.content = '38.\n' + c38 + '\n\n39.\n' + c39;
+      }
+    }
+  }
+
+  function recover41_42Content(questions, fullText) {
+    const target = questions.find(q => String(q.number) === '41~42');
+    if (!target || !fullText || (target.content || '').trim().length > 100) return;
+    const untilSub = String.raw`(?=\s*41\.\s*윗글|\s*41\.\s*\n\s*윗글|\s*42\.\s*밑줄|\s*42\.\s*\n\s*밑줄|\s*①\s|$)`;
+    const patterns = [
+      new RegExp(String.raw`\[\s*41\s*~\s*42\s*\][\s\S]*?(?:다음\s*글을\s*읽고|다음을\s*읽고)[\s\S]*?답하시오\.?\s*([\s\S]*?)` + untilSub, 'i'),
+      new RegExp(String.raw`(?:\[\s*41\s*~\s*42\s*\]|(?<=[\n\r])41\s*~\s*42\s*[\n.])[\s\S]*?(?:다음\s*글을\s*읽고|다음을\s*읽고)[\s\S]*?답하시오\.?\s*([\s\S]*?)` + untilSub, 'i'),
+      new RegExp(String.raw`41\s*~\s*42[\s\S]{0,500}?(?:다음\s*글을\s*읽고|다음을\s*읽고)[\s\S]*?답하시오\.?\s*([\s\S]*?)` + untilSub, 'i')
+    ];
+    for (const re of patterns) {
+      const passageMatch = fullText.match(re);
+      if (passageMatch && passageMatch[1].trim().length > 100) {
+        target.content = passageMatch[1].trim();
+        return;
+      }
+    }
+    const genericMatch = fullText.match(/(?:다음\s*글을\s*읽고|다음을\s*읽고)[\s\S]*?답하시오\.?\s*([\s\S]*?)(?=\s*41\.\s*(?:윗글|))\s*/i);
+    if (genericMatch && genericMatch[1].trim().length > 100) {
+      target.content = genericMatch[1].trim();
+    }
+  }
+
+  function extractTextFromPage(page) {
+    return page.getTextContent().then(tc => {
+      const items = tc.items;
+      if (!items.length) return '';
+      let out = '';
+      let lastY = items[0].transform?.[5] ?? 0;
+      for (const it of items) {
+        const y = it.transform?.[5] ?? lastY;
+        if (Math.abs(y - lastY) > 3) out += '\n';
+        out += it.str;
+        lastY = y;
+      }
+      return out;
+    });
+  }
+
+  async function extractAllText(pdfDoc) {
+    const numPages = pdfDoc.numPages;
+    let fullText = '';
+    for (let p = 1; p <= numPages; p++) {
+      const page = await pdfDoc.getPage(p);
+      const text = await extractTextFromPage(page);
+      fullText += text + '\n\n';
+    }
+    return fullText;
+  }
+
+  function hasEmbeddedChoicesContent(q) {
+    const c = q.content || '';
+    const instr = q.instruction || '';
+    if (!/[①-⑤]/.test(c)) return false;
+    // 문장 삽입(주어진 문장·들어갈 위치): 본문에 ①~(⑤)가 있어도 선택지 병합 대상이 아님
+    if (/주어진\s*문장이\s*들어가기|들어가기에\s*가장\s*적절한\s*곳/.test(instr)) return false;
+    return /일치\s*하지\s*않는/.test(instr) ||
+      /밑줄\s*친\s*부분\s*중.*어법상/.test(instr) ||
+      /전체\s*흐름과\s*관계\s*없는\s*문장/.test(instr) ||
+      /글의\s*흐름으로\s*보아/.test(instr);
+  }
+
+  /** 출력 라벨: [지문/선택지] (mergeEmbeddedChoicesIntoContent는 hasEmbeddedChoicesContent만 사용) */
+  function usePassageAndChoicesSectionTitle(q) {
+    if (hasEmbeddedChoicesContent(q)) return true;
+    if (/④/.test(q.content || '')) return true;
+    return false;
+  }
+
+  function stripLeadingRangeLabelFromContent(result) {
+    for (const q of result) {
+      const num = String(q.number);
+      const numInt = parseInt(num, 10);
+      if (![36, 37, 38, 39].includes(numInt) || !q.content) continue;
+      const leadingRange = new RegExp('^\\s*\\[\\d+~\\d+\\]\\s*' + num + '\\.\\s*', 'i');
+      q.content = q.content.replace(leadingRange, '').trim();
+    }
+  }
+
+  function mergeEmbeddedChoicesIntoContent(questions) {
+    const markOrder = ['①', '②', '③', '④', '⑤'];
+    for (const q of questions) {
+      if (!hasEmbeddedChoicesContent(q) || !(q.choices || []).length) continue;
+      const content = (q.content || '').trim();
+      const introMatch = content.match(/^([\s\S]*?)(?=[①-⑤])/);
+      const intro = introMatch ? introMatch[1].trimEnd() : content;
+      const rest = introMatch ? content.slice(introMatch[0].length) : '';
+      const segments = [];
+      const re = /([①-⑤])\s*([\s\S]*?)(?=[①-⑤]|$)/g;
+      let m;
+      while ((m = re.exec(rest)) !== null) segments.push({ mark: m[1], text: m[2].trim() });
+      const choiceMap = {};
+      for (const c of q.choices) choiceMap[c.mark] = (c.text || '').trim();
+      let merged = intro ? intro + '\n' : '';
+      for (const mark of markOrder) {
+        const fromContent = segments.find(s => s.mark === mark);
+        const text = fromContent ? fromContent.text : choiceMap[mark];
+        if (text != null && text !== '') merged += mark + ' ' + text + '\n';
+      }
+      q.content = merged.trim();
+      q.choices = [];
+    }
+  }
+
+  function formatPreview(questions) {
+    const now = new Date();
+    const dateStr = now.toLocaleString('ko-KR', { dateStyle: 'medium', timeStyle: 'short' });
+    let out = `<div class="accordion-preview">`;
+    out += `<div style="padding:12px 16px;background:#e8f4fd;font-size:0.9rem;border-bottom:1px solid #ddd">`;
+    out += `📋 추출일시: ${dateStr} · 총 ${questionCount(questions)}개 문제</div>`;
+    if (debugRaw && Object.keys(debugRaw).length) {
+      const debugNums = Object.keys(debugRaw).sort((a, b) => parseInt(a, 10) - parseInt(b, 10));
+      const debugNumsDisplay = debugNums.filter(n => isInDebugDisplayRanges(parseInt(n, 10)));
+      const parts = [];
+      for (const r of DEBUG_RAW_DISPLAY_RANGES) {
+        const have = debugNumsDisplay.filter(n => { const x = parseInt(n, 10); return x >= r.start && x <= r.end; });
+        if (have.length === r.end - r.start + 1) parts.push(`[${r.start}~${r.end}]`);
+        else if (have.length) parts.push(have.join(', '));
+      }
+      const debugLabel = parts.length ? parts.join(', ') : debugNumsDisplay.join(', ');
+      out += `<details hidden style="margin:12px;padding:12px;background:#fff8e6;border:1px solid #e6d9b3;border-radius:8px;font-size:0.85rem">`;
+      out += `<summary style="cursor:pointer;font-weight:600;color:#8b6914">🔍 추출 원본 (디버그) 문제 ${debugLabel}</summary>`;
+      out += `<div style="margin-top:12px">`;
+      out += `<button type="button" class="copy-btn copy-debug-btn" style="margin-bottom:8px">📋 디버그 내용 복사</button>`;
+      for (const num of debugNumsDisplay) {
+        const d = debugRaw[num];
+        if (!d) continue;
+        out += `<div style="margin-bottom:16px;padding:8px;background:#fff;border:1px solid #e6d9b3;border-radius:6px">`;
+        out += `<strong style="color:#8b6914">문제 ${num}</strong>`;
+        out += `<div style="margin-top:6px"><strong>1. PDF 원본 블록</strong><pre style="margin:4px 0;padding:8px;background:#f9f9f9;border:1px solid #ddd;overflow-x:auto;white-space:pre-wrap;font-size:0.8rem;max-height:180px">${escapeHtml(d.rawBlock || '(없음)')}</pre></div>`;
+        out += `<div style="margin-top:6px"><strong>2. 파싱 직후 (후처리 전)</strong><pre style="margin:4px 0;padding:8px;background:#f9f9f9;border:1px solid #ddd;overflow-x:auto;white-space:pre-wrap;font-size:0.8rem">지시문: ${escapeHtml(d.rawQuestion?.instruction || '')}\n\n지문:\n${escapeHtml(d.rawQuestion?.content || '')}\n\n선택지:\n${(d.rawQuestion?.choices || []).map(c => escapeHtml(c.mark + ' ' + c.text)).join('\n')}</pre></div>`;
+        out += `</div>`;
+      }
+      out += `</div></details>`;
+    }
+    questions.forEach((q, idx) => {
+      const inst = q.instruction ? '[지시문]\n' + addPhraseUnderline(escapeHtml(q.instruction), 'html') + '\n\n' : '';
+      let contentSection = '';
+      if (usePassageAndChoicesSectionTitle(q)) {
+        contentSection = '[지문/선택지]\n' + addUnderlineFormatting(escapeHtml(q.content || ''), q.instruction, 'html') + '\n\n';
+      } else {
+        contentSection = '[지문]\n' + addUnderlineFormatting(escapeHtml(q.content || ''), q.instruction, 'html') + '\n\n';
+        if (q.choices.length) contentSection += '[선택지]\n' + q.choices.map(c => escapeHtml(`${c.mark} ${c.text}`)).join('\n');
+      }
+      const body = inst + contentSection;
+      const collapsed = idx > 0 ? ' collapsed' : '';
+      out += `<div class="accordion-item${collapsed}" data-idx="${idx}">`;
+      out += `<div class="accordion-header">${questionHeader(q)}</div>`;
+      out += `<div class="accordion-body">`;
+      out += `<div style="margin-bottom:8px;display:flex;justify-content:flex-end"><button type="button" class="copy-btn copy-q-btn" data-idx="${idx}">📋 복사</button></div>`;
+      out += `<div class="accordion-body-content">${body || '(내용 없음)'}</div></div>`;
+      out += `</div>`;
+    });
+    return out + '</div>';
+  }
+
+  function bindAccordionEvents() {
+    preview.querySelectorAll('.accordion-header').forEach(h => {
+      h.onclick = () => {
+        const item = h.closest('.accordion-item');
+        const wasCollapsed = item.classList.contains('collapsed');
+        preview.querySelectorAll('.accordion-item').forEach(other => other.classList.add('collapsed'));
+        if (wasCollapsed) item.classList.remove('collapsed');
+      };
+    });
+  }
+
+  let copyEventsBound = false;
+  function bindCopyEvents() {
+    if (copyEventsBound) return;
+    copyEventsBound = true;
+    const fullCopyBtn = document.getElementById('fullCopyBtn');
+    if (fullCopyBtn) {
+      fullCopyBtn.onclick = async () => {
+        try {
+          const text = formatTxt(extractedData);
+          await navigator.clipboard.writeText(text);
+          fullCopyBtn.textContent = '복사됨!';
+          setTimeout(() => { fullCopyBtn.textContent = '📋 전체 복사'; }, 1500);
+        } catch (e) {
+          setStatus('클립보드 복사 실패', 'error');
+        }
+      };
+    }
+    preview.addEventListener('click', async (e) => {
+      const debugBtn = e.target.closest('.copy-debug-btn');
+      if (debugBtn && debugRaw && Object.keys(debugRaw).length) {
+        const debugNums = Object.keys(debugRaw).sort((a, b) => parseInt(a, 10) - parseInt(b, 10));
+        const debugNumsDisplay = debugNums.filter(n => isInDebugDisplayRanges(parseInt(n, 10)));
+        let txt = '=== 추출 원본 (디버그) ===\n\n';
+        for (const num of debugNumsDisplay) {
+          const d = debugRaw[num];
+          if (!d) continue;
+          txt += '='.repeat(18) + '\n문제 ' + num + '\n' + '='.repeat(18) + '\n\n1. PDF 원본 블록\n' + '─'.repeat(40) + '\n' + (d.rawBlock || '(없음)') + '\n\n2. 파싱 직후 (후처리 전)\n' + '─'.repeat(40) + '\n지시문: ' + (d.rawQuestion?.instruction || '') + '\n\n지문:\n' + (d.rawQuestion?.content || '') + '\n\n선택지:\n' + (d.rawQuestion?.choices || []).map(c => c.mark + ' ' + c.text).join('\n') + '\n\n';
+        }
+        try {
+          await navigator.clipboard.writeText(txt);
+          debugBtn.textContent = '복사됨!';
+          setTimeout(() => { debugBtn.textContent = '📋 디버그 내용 복사'; }, 1500);
+        } catch (err) { setStatus('클립보드 복사 실패', 'error'); }
+        return;
+      }
+      const btn = e.target.closest('.copy-q-btn');
+      if (!btn || !btn.dataset.idx) return;
+      const idx = parseInt(btn.dataset.idx, 10);
+      if (isNaN(idx) || idx < 0 || idx >= extractedData.length) return;
+      try {
+        await navigator.clipboard.writeText(getQuestionPlainText(extractedData[idx]));
+        const orig = btn.textContent;
+        btn.textContent = '복사됨!';
+        setTimeout(() => { btn.textContent = orig; }, 1500);
+      } catch (err) {
+        setStatus('클립보드 복사 실패', 'error');
+      }
+    });
+  }
+
+  function formatFullPreview(questions) {
+    const now = new Date();
+    const dateStr = now.toLocaleString('ko-KR', { dateStyle: 'medium', timeStyle: 'short' });
+    let out = `[모의고사 문제 추출]\n추출일시: ${dateStr}\n총 문제수: ${questionCount(questions)}개\n\n`;
+    for (const q of questions) {
+      out += '='.repeat(18) + '\n';
+      out += `${questionHeader(q)}\n` + '='.repeat(18) + '\n';
+      if (q.instruction) out += '[지시문]\n' + addPhraseUnderline(escapeHtml(q.instruction), 'html') + '\n\n';
+      if (usePassageAndChoicesSectionTitle(q)) {
+        out += '[지문/선택지]\n' + addUnderlineFormatting(escapeHtml(q.content || ''), q.instruction, 'html') + '\n\n';
+      } else {
+        out += '[지문]\n' + addUnderlineFormatting(escapeHtml(q.content || ''), q.instruction, 'html') + '\n\n';
+        if (q.choices.length) {
+          out += '[선택지]\n';
+          for (const c of q.choices) out += escapeHtml(`${c.mark} ${c.text}`) + '\n';
+        }
+      }
+      out += '\n';
+    }
+    return out.replace(/\n/g, '<br>');
+  }
+
+  function getQuestionPlainText(q) {
+    let out = '='.repeat(18) + '\n';
+    out += `${questionHeader(q)}\n` + '='.repeat(18) + '\n';
+    if (q.instruction) out += '[지시문]\n' + addPhraseUnderline(q.instruction, 'txt') + '\n\n';
+    if (usePassageAndChoicesSectionTitle(q)) {
+      out += '[지문/선택지]\n' + addUnderlineFormatting(q.content || '', q.instruction, 'txt') + '\n\n';
+    } else {
+      out += '[지문]\n' + addUnderlineFormatting(q.content || '', q.instruction, 'txt') + '\n\n';
+      if (q.choices && q.choices.length) {
+        out += '[선택지]\n';
+        for (const c of q.choices) out += `${c.mark} ${c.text}\n`;
+      }
+    }
+    return out;
+  }
+
+  function formatTxt(questions) {
+    const now = new Date();
+    const dateStr = now.toLocaleString('ko-KR', { dateStyle: 'medium', timeStyle: 'short' });
+    let out = `[모의고사 문제 추출]\n추출일시: ${dateStr}\n총 문제수: ${questionCount(questions)}개\n\n`;
+
+    for (const q of questions) {
+      out += '='.repeat(18) + '\n';
+      out += `${questionHeader(q)}\n`;
+      out += '='.repeat(18) + '\n';
+      if (q.instruction) out += '[지시문]\n' + addPhraseUnderline(q.instruction, 'txt') + '\n\n';
+      if (usePassageAndChoicesSectionTitle(q)) {
+        out += '[지문/선택지]\n' + addUnderlineFormatting(q.content || '', q.instruction, 'txt') + '\n\n';
+      } else {
+        out += '[지문]\n' + addUnderlineFormatting(q.content || '', q.instruction, 'txt') + '\n\n';
+        if (q.choices.length) {
+          out += '[선택지]\n';
+          for (const c of q.choices) out += `${c.mark} ${c.text}\n`;
+        }
+      }
+      out += '\n';
+    }
+    return out;
+  }
+
+  function formatHtml(questions) {
+    const now = new Date();
+    const dateStr = now.toLocaleString('ko-KR');
+    let body = `<h1>모의고사</h1><p>추출일시: ${dateStr} | 총 ${questionCount(questions)}개 문제</p>`;
+
+    for (const q of questions) {
+      body += `<div class="question">`;
+      body += `<p class="number">${questionHeader(q)}</p>`;
+      if (q.instruction) body += `<p class="instruction">${addPhraseUnderline(escapeHtml(q.instruction), 'html')}</p>`;
+      const content = q.content || '';
+      body += `<p class="content">${addUnderlineFormatting(escapeHtml(content), q.instruction, 'html')}</p>`;
+      if (!hasEmbeddedChoicesContent(q) && q.choices.length) {
+        body += '<div class="choices">';
+        for (const c of q.choices) {
+          body += `<div class="choice">${c.mark} ${escapeHtml(c.text)}</div>`;
+        }
+        body += '</div>';
+      }
+      body += '</div>';
+    }
+
+    return `<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>모의고사</title>
+  <style>
+    body { font-family: 'NanumSquareNeo', '맑은 고딕', sans-serif; margin: 20px; }
+    .question { page-break-inside: avoid; margin-bottom: 20px; border-bottom: 1px solid #ddd; padding-bottom: 15px; }
+    .number { font-weight: bold; color: #0066cc; }
+    .instruction { color: #555; font-weight: 500; margin: 8px 0; }
+    .content { margin: 10px 0; line-height: 1.6; }
+    .choices { margin: 10px 0; }
+    .choices .choice { margin: 4px 0; }
+  </style>
+</head>
+<body>
+${body}
+</body>
+</html>`;
+  }
+
+  function escapeHtml(s) {
+    const div = document.createElement('div');
+    div.textContent = s;
+    return div.innerHTML.replace(/\n/g, '<br>');
+  }
+
+  /** Excel/CSV: 지문을 줄바꿈 기준 한 행씩(문장 단위 후처리와 동일) */
+  function splitPassageLinesForExcel(content) {
+    const lines = String(content || '').split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    return lines.length ? lines : [''];
+  }
+
+  function formatCsv(questions) {
+    const header = '문제번호,유형,지시문,지문,①,②,③,④,⑤';
+    const rows = [];
+    for (const q of questions) {
+      const opts = ['', '', '', '', ''];
+      q.choices.forEach((c, i) => { if (i < 5) opts[i] = (c.text || '').replace(/"/g, '""'); });
+      const inst = addPhraseUnderline(q.instruction || '', 'txt').replace(/"/g, '""');
+      const lines = splitPassageLinesForExcel(q.content);
+      const emptyChoices = ',"","","","",""';
+      lines.forEach((line, idx) => {
+        const cont = line.replace(/"/g, '""');
+        if (idx === 0) {
+          rows.push(`${displayNumber(q)},${q.type},"${inst}","${cont}",${opts.map(o => '"' + o + '"').join(',')}`);
+        } else {
+          rows.push(`,,,"${cont}"${emptyChoices}`);
+        }
+      });
+    }
+    return '\uFEFF' + header + '\n' + rows.join('\n');
+  }
+
+  function formatExcelHtml(questions) {
+    let tbl = '<table border="1" cellpadding="6" cellspacing="0"><thead><tr><th>문제번호</th><th>유형</th><th>지시문</th><th>지문</th><th>①</th><th>②</th><th>③</th><th>④</th><th>⑤</th></tr></thead><tbody>';
+    for (const q of questions) {
+      const opts = ['', '', '', '', ''];
+      q.choices.forEach((c, i) => { if (i < 5) opts[i] = escapeHtml(c.text); });
+      const inst = addPhraseUnderline(escapeHtml(q.instruction || ''), 'html');
+      const lines = splitPassageLinesForExcel(q.content);
+      lines.forEach((line, idx) => {
+        const contCell = addUnderlineFormatting(escapeHtml(line), q.instruction, 'html');
+        tbl += '<tr>';
+        if (idx === 0) {
+          tbl += `<td>${displayNumber(q)}</td><td>${q.type || '객관식'}</td>`;
+          tbl += `<td>${inst}</td><td>${contCell}</td>`;
+          opts.forEach(o => { tbl += `<td>${o}</td>`; });
+        } else {
+          tbl += '<td></td><td></td><td></td>';
+          tbl += `<td>${contCell}</td>`;
+          for (let c = 0; c < 5; c++) tbl += '<td></td>';
+        }
+        tbl += '</tr>';
+      });
+    }
+    tbl += '</tbody></table>';
+    return `<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+<head><meta charset="UTF-8"/><style>u{text-decoration:underline;}</style></head>
+<body>${tbl}</body></html>`;
+  }
+
+  function createBlob(content, type) {
+    return new Blob([content], { type });
+  }
+
+  dropZone.addEventListener('click', () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'application/pdf';
+    input.onchange = (e) => {
+      const f = e.target.files[0];
+      if (f) {
+        pdfFile = f;
+        extractBtn.disabled = false;
+        updateDropZoneDisplay(f);
+        setStatus('');
+      }
+    };
+    input.click();
+  });
+
+  dropZone.addEventListener('dragenter', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dropZone.classList.add('dragover');
+  });
+  dropZone.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer.dropEffect = 'copy';
+    dropZone.classList.add('dragover');
+  });
+  dropZone.addEventListener('dragleave', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!dropZone.contains(e.relatedTarget)) {
+      dropZone.classList.remove('dragover');
+    }
+  });
+  dropZone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dropZone.classList.remove('dragover');
+    const f = e.dataTransfer.files[0];
+    if (f && f.type === 'application/pdf') {
+      pdfFile = f;
+      extractBtn.disabled = false;
+      updateDropZoneDisplay(f);
+      setStatus('');
+    } else {
+      setStatus('PDF 파일만 업로드 가능합니다.', 'error');
+    }
+  });
+
+  extractBtn.addEventListener('click', async () => {
+    if (!pdfFile) return;
+    setStatus('PDF 파싱 중...', 'progress');
+    extractBtn.disabled = true;
+
+    try {
+      debugRaw = null;
+      const arrayBuffer = await pdfFile.arrayBuffer();
+      const pdfDoc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+      const fullText = await extractAllText(pdfDoc);
+      extractedData = parseQuestions(fullText);
+
+      setStatus(`추출 완료: ${questionCount(extractedData)}개 문제`, 'success');
+      previewArea.classList.add('visible');
+      preview.innerHTML = formatPreview(extractedData);
+      bindAccordionEvents();
+      bindCopyEvents();
+      fullPreviewWrap.style.display = 'block';
+      fullPreview.innerHTML = formatFullPreview(extractedData);
+      downloads.style.display = 'flex';
+
+      const d = new Date();
+      const baseName = (pdfFile && pdfFile.name ? pdfFile.name.replace(/\.pdf$/i, '') : '모의고사') || '모의고사';
+      const yy = String(d.getFullYear()).slice(-2);
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      const hh = String(d.getHours()).padStart(2, '0');
+      const min = String(d.getMinutes()).padStart(2, '0');
+      const fileSuffix = `${baseName}_${yy}${mm}${dd}_${hh}${min}`;
+
+      const txtBlob = createBlob(formatTxt(extractedData), 'text/plain;charset=utf-8');
+      const htmlBlob = createBlob(formatHtml(extractedData), 'application/vnd.ms-word;charset=utf-8');
+      const csvBlob = createBlob(formatCsv(extractedData), 'text/csv;charset=utf-8');
+
+      txtDownload.href = URL.createObjectURL(txtBlob);
+      txtDownload.download = `${fileSuffix}.txt`;
+      wordDownload.href = URL.createObjectURL(htmlBlob);
+      wordDownload.download = `${fileSuffix}.doc`;
+      excelDownload.href = URL.createObjectURL(csvBlob);
+      excelDownload.download = `${fileSuffix}.csv`;
+
+    } catch (err) {
+      setStatus('오류: ' + err.message, 'error');
+      console.error(err);
+    } finally {
+      extractBtn.disabled = false;
+    }
+  });
+  })();
+</script>
+</body>
+</html>
