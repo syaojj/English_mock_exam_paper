@@ -206,7 +206,7 @@
   <div class="container">
     <main>
       <h1><img src="favicon.png" alt="" class="title-icon"> 모의고사 문제 추출기</h1>
-      <p class="version">v9.6</p>
+      <p class="version">v8.8</p>
       <div id="dropZone">
         <p id="dropZoneText">PDF를 드래그하거나 클릭하여 업로드</p>
         <p class="hint">모의고사, 시험지, 학습자료 PDF 지원</p>
@@ -297,105 +297,14 @@
   const PAGE_HEADER_PATTERN = /고\s*1\s*영어\s*영역\s*\d*\]?\s*$/gm;
   const PAGE_FOOTER_WITH_UNDERLINE = /\n\s*고\s*1\s*영어\s*영역\s*\d*[^\n]*\n?\s*[━─_\s]{2,}\s*$/;
   const TRAILING_DECORATION_LINE = /\n\s*[━─_]{2,}\s*$/;
-  // 추출 원본(디버그): 36~37은 지문 복원용 캡처, UI 노출은 38~39만 ([41~42] 제외)
-  const DEBUG_RAW_CAPTURE_RANGES = [{ start: 36, end: 37 }, { start: 38, end: 39 }];
-  const DEBUG_RAW_DISPLAY_RANGES = [{ start: 38, end: 39 }];
+  // 추출 원본(디버그): 캡처 범위(36~37 포함 시 지문 복원용), 노출 범위(UI에는 38~39, 41~42만)
+  const DEBUG_RAW_CAPTURE_RANGES = [{ start: 36, end: 37 }, { start: 38, end: 39 }, { start: 41, end: 42 }];
+  const DEBUG_RAW_DISPLAY_RANGES = [{ start: 38, end: 39 }, { start: 41, end: 42 }];
   function isInDebugCaptureRanges(numInt) {
     return Number.isInteger(numInt) && DEBUG_RAW_CAPTURE_RANGES.some(r => numInt >= r.start && numInt <= r.end);
   }
   function isInDebugDisplayRanges(numInt) {
     return Number.isInteger(numInt) && DEBUG_RAW_DISPLAY_RANGES.some(r => numInt >= r.start && numInt <= r.end);
-  }
-
-  /** 38~39 병합 시 파싱 루프가 debugRaw['38'|'39']를 안 남김 → 디버그 UI용으로 보강 */
-  function ensureDebugRawEntries3839(questions, text) {
-    if (!debugRaw || typeof debugRaw !== 'object' || !text) return;
-    const missing38 = !debugRaw['38'];
-    const missing39 = !debugRaw['39'];
-    if (!missing38 && !missing39) return;
-
-    const block38Re = new RegExp('(?:38\\.\\s|\\[38~\\d+\\][\\.]?\\s)[\\s\\S]*?(?=\\s*(?:39\\.\\s|\\[39~)|$)', '');
-    const block39Re = new RegExp('(?:39\\.\\s|\\[39~\\d+\\][\\.]?\\s)[\\s\\S]*?(?=\\s*(?:40\\.\\s|\\[40~)|$)', '');
-    const m38 = text.match(block38Re);
-    const m39 = text.match(block39Re);
-
-    const merged = questions.find(q => String(q.number) === '38~39');
-    const chs = merged && merged.choices ? merged.choices : [];
-    let sharedInst = merged ? String(merged.instruction || '').trim() : '';
-    if (!sharedInst) {
-      const im = text.match(/\[\s*38\s*~\s*39\s*\]\s*([^\r\n]+)/);
-      if (im) sharedInst = im[1].replace(/\s+/g, ' ').trim();
-    }
-
-    const cloneChoices = (arr) => JSON.parse(JSON.stringify(arr || []));
-    const make38 = (content) => ({
-      number: '38',
-      instruction: sharedInst,
-      content: (content || '').replace(/^\s*38\.\s*\n?/i, '').trim(),
-      choices: cloneChoices(chs.length >= 5 ? chs.slice(0, 5) : chs),
-      type: '객관식'
-    });
-    const make39 = (content) => ({
-      number: '39',
-      instruction: sharedInst,
-      content: (content || '').replace(/^\s*39\.\s*\n?/i, '').trim(),
-      choices: cloneChoices(chs.length >= 10 ? chs.slice(5, 10) : []),
-      type: '객관식'
-    });
-
-    if (merged && (merged.content || '').trim()) {
-      const c = (merged.content || '').trim();
-      let parts = c.split(/\r?\n\s*39\.\s+/, 2);
-      if (parts.length < 2) parts = c.split(/\s*39\.\s+/, 2);
-      if (parts.length >= 2) {
-        if (missing38) {
-          debugRaw['38'] = {
-            rawBlock: m38 ? m38[0].trim() : null,
-            rawQuestion: make38(m38 ? m38[0] : parts[0])
-          };
-        }
-        if (missing39) {
-          debugRaw['39'] = {
-            rawBlock: m39 ? m39[0].trim() : null,
-            rawQuestion: make39(m39 ? m39[0] : parts[1])
-          };
-        }
-        return;
-      }
-    }
-
-    if (missing38 && m38) debugRaw['38'] = { rawBlock: m38[0].trim(), rawQuestion: make38(m38[0]) };
-    if (missing39 && m39) debugRaw['39'] = { rawBlock: m39[0].trim(), rawQuestion: make39(m39[0]) };
-  }
-
-  /** 디버그 rawBlock에서 38·39 지문 본문만 (공통 [38~39] 지시·문항 번호·말미 [3점] 제거) */
-  function parsePassageBodyFrom3839RawBlock(rawBlock, num) {
-    if (!rawBlock) return '';
-    let s = String(rawBlock).trim();
-    s = s.replace(/^\[\s*38\s*~\s*39\s*\][^\r\n]*(?:\r?\n)+/i, '');
-    s = s.replace(new RegExp('^\\s*' + num + '\\.\\s*', 'i'), '').trim();
-    s = s.replace(/\s*\[\s*3\s*점\s*\]\s*$/i, '').trim();
-    return s;
-  }
-
-  /** 최종 result·debugRaw: 병합 분할 오류로 짧아진 38·39 지문을 PDF 원본 블록으로 보강 */
-  function recover3839PassageFromDebugRawResult(result) {
-    if (!result || !debugRaw) return;
-    for (const n of ['38', '39']) {
-      const raw = debugRaw[n];
-      if (!raw || !raw.rawBlock) continue;
-      const body = parsePassageBodyFrom3839RawBlock(raw.rawBlock, n);
-      if (body.length < 80) continue;
-      const q = result.find(r => String(r.number) === n);
-      const curQ = q ? (q.content || '').trim() : '';
-      const curDbg = (raw.rawQuestion && raw.rawQuestion.content) ? String(raw.rawQuestion.content).trim() : '';
-      if (body.length > curQ.length + 60) {
-        if (q) q.content = body;
-      }
-      if (body.length > curDbg.length + 60 && raw.rawQuestion) {
-        raw.rawQuestion.content = body;
-      }
-    }
   }
 
   function processImagePlaceholders(text) {
@@ -464,50 +373,8 @@
     return questions;
   }
 
-  /** 지문: 단일 줄바꿈→공백, 문장 단위 마침표 뒤 줄바꿈(Ph.D·이메일·소수 등 제외) */
-  function insertSentenceBreaksAfterPeriod(para) {
-    const tokens = [];
-    const pushPh = (m) => { const i = tokens.length; tokens.push(m); return '\uE000' + i + '\uE001'; };
-
-    let s = para;
-    s = s.replace(/\.{3,}/g, pushPh);
-    s = s.replace(/\d+\.\d+(?:[eE][+-]?\d+)?/g, pushPh);
-    s = s.replace(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z0-9.-]+/g, pushPh);
-    const abbrRe = /\b(?:Ph\.D\.|Ph\.D|E\.g\.|e\.g\.|I\.e\.|i\.e\.|Mr\.|Mrs\.|Ms\.|Dr\.|Vs\.|vs\.|Jr\.|Sr\.|Inc\.|Ltd\.|Prof\.|U\.S\.|U\.K\.|E\.U\.|a\.m\.|p\.m\.|etc\.)(?=\s|$)/gi;
-    s = s.replace(abbrRe, pushPh);
-    s = s.replace(/(^|\n)(\s*)(\d{1,2})\.\s/g, (_, a, ws, n) => a + ws + pushPh(n + '. '));
-    s = s.replace(/(?<=\.\s)(\d{1,2})\.\s/g, pushPh);
-    s = s.replace(/\.(\s+)(?=[A-Z가-힣①-⑤㉠-㉥Ⓐ-Ⓔ]|[(（"]|\d)/g, '.\n');
-    for (let i = tokens.length - 1; i >= 0; i--) {
-      s = s.split('\uE000' + i + '\uE001').join(tokens[i]);
-    }
-    return s.replace(/[ \t]+/g, ' ').replace(/\n[ \t]+/g, '\n').replace(/[ \t]+\n/g, '\n').trim();
-  }
-
-  /** 불릿(•) 앞에 줄바꿈 — 공백만 있는 경우 제거 후 한 줄로 */
-  function insertBulletNewlines(para) {
-    if (!para || !/•/.test(para)) return para;
-    return para.replace(/(?<=\S)\s+•/g, '\n•').replace(/\n{3,}/g, '\n\n');
-  }
-
-  function formatPassageLineBreaks(raw) {
-    if (!raw || !String(raw).trim()) return raw;
-    const str = String(raw);
-    const footParts = str.split(/\n(?=\s*\*)/);
-    const main = footParts[0];
-    const foot = footParts.length > 1 ? '\n' + footParts.slice(1).join('\n') : '';
-
-    let s = main.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-    const paras = s.split(/\n{2,}/).map(p => p.replace(/\n/g, ' ').replace(/[ \t]+/g, ' ').trim()).filter(Boolean);
-    const formatted = paras.map(p => insertBulletNewlines(insertSentenceBreaksAfterPeriod(p)));
-    return formatted.join('\n\n') + foot;
-  }
-
   function finalizeExtractedResult(result) {
     applyDisplayInstructionCleanup(result);
-    for (const q of result) {
-      if (q.content) q.content = formatPassageLineBreaks(q.content);
-    }
     sortExtractedQuestionsByNumber(result);
     return result;
   }
@@ -1463,19 +1330,9 @@
       if (numStr === '38~39') {
         const content = (q.content || '').trim();
         const isVision = /Vision is influenced|preconceptions about reality/.test(content);
-        let c38 = '';
-        let c39 = '';
-        if (!isVision) {
-          // 첫 구분 '39.'에서만 분할 (split 전체는 본문 속 '39.'에도 잘려 39번 지문이 중간에서 끊김)
-          let parts = content.split(/\r?\n\s*39\.\s+/, 2);
-          if (parts.length < 2) parts = content.split(/\s*39\.\s+/, 2);
-          if (parts.length >= 2) {
-            c38 = (parts[0] || '').replace(/^\s*38\.\s*\n?/i, '').trim();
-            c39 = (parts[1] || '').trim();
-          } else {
-            c38 = content.replace(/^\s*38\.\s*\n?/i, '').trim();
-          }
-        }
+        const parts = isVision ? ['', ''] : content.split(/\s*39\.\s+/m);
+        const c38 = (parts[0] || '').replace(/^\s*38\.\s*\n?/i, '').trim();
+        const c39 = (parts[1] || '').replace(/^\s*39\.\s*\n?/i, '').trim();
         const chs = choices.length >= 5 ? choices.slice(0, 5) : choices;
         let rangeInst = (q.instruction || '글의 흐름으로 보아, 주어진 문장이 들어가기에 가장 적절한 곳을 고르시오.').replace(/\s+/g, ' ').trim();
         const m3839 = rangeInst.match(/글의\s*흐름으로\s*보아[\s\S]*?고르시오\.?/);
@@ -1487,8 +1344,8 @@
           choices: [],
           type: '객관식'
         });
-        result.push({ number: '38', instruction: '', content: isVision ? '' : c38, choices: chs, type: '객관식' });
-        result.push({ number: '39', instruction: '', content: isVision ? '' : c39, choices: chs, type: '객관식' });
+        result.push({ number: '38', instruction: rangeInst, content: isVision ? '' : c38, choices: chs, type: '객관식' });
+        result.push({ number: '39', instruction: rangeInst, content: isVision ? '' : c39, choices: chs, type: '객관식' });
         continue;
       }
       if (numStr === '41~42' && choices.length >= 10) {
@@ -1715,7 +1572,6 @@
       consolidate4142HeaderQuestions(questions);
       mergeRangeQuestions(questions);
       deduplicateRangeQuestions(questions);
-      inject3839MergedQuestionFromFullText(questions, text);
       splitMergedQuestions(questions);
       splitRangeWithoutDelimiter(questions);
       reassignMisplacedPassages(questions);
@@ -1740,7 +1596,6 @@
       fix38_39And40Content(questions);
       recover36_37Content(questions, text);
       recover38_39Content(questions, text);
-      ensureDebugRawEntries3839(questions, text);
       recover41_42Content(questions, text);
       const result = expandRangeQuestionsForOutput(questions);
       result.forEach(q => { q.instruction = (q.instruction || '').replace(INSTRUCTION_POINT_PATTERN, '').trim(); });
@@ -1748,7 +1603,6 @@
       mergeEmbeddedChoicesIntoContent(result);
       restoreParsedStateForDebugQuestions(result);
       recoverContentFromRawBlock(result);
-      recover3839PassageFromDebugRawResult(result);
       stripLeadingRangeLabelFromContent(result);
       return finalizeExtractedResult(result);
     }
@@ -1846,7 +1700,6 @@
       consolidate4142HeaderQuestions(questions);
       mergeRangeQuestions(questions);
       deduplicateRangeQuestions(questions);
-      inject3839MergedQuestionFromFullText(questions, text);
       splitMergedQuestions(questions);
       splitRangeWithoutDelimiter(questions);
       reassignMisplacedPassages(questions);
@@ -1871,7 +1724,6 @@
       fix38_39And40Content(questions);
       recover36_37Content(questions, text);
       recover38_39Content(questions, text);
-      ensureDebugRawEntries3839(questions, text);
       recover41_42Content(questions, text);
     }
     const result = expandRangeQuestionsForOutput(questions);
@@ -1880,7 +1732,6 @@
     mergeEmbeddedChoicesIntoContent(result);
     restoreParsedStateForDebugQuestions(result);
     recoverContentFromRawBlock(result);
-    recover3839PassageFromDebugRawResult(result);
     stripLeadingRangeLabelFromContent(result);
     return finalizeExtractedResult(result);
   }
@@ -1900,44 +1751,6 @@
         q.content = '';
       }
     }
-  }
-
-  /** 병합 실패(열 순서 등)로 questions에 38·39·38~39가 없을 때 fullText에서 병합 문항 삽입 → expand에서 목록에 노출 */
-  function inject3839MergedQuestionFromFullText(questions, fullText) {
-    if (!questions || !fullText || !fullText.trim()) return;
-    if (questions.some(q => String(q.number) === '38~39')) return;
-    if (questions.some(q => String(q.number) === '38')) return;
-    if (questions.some(q => String(q.number) === '39')) return;
-
-    const generic38 = fullText.match(/(?:^|[^\d])38\.\s*([\s\S]*?)(?=(?:^|[^\d])39\.\s*)/m);
-    const generic39 = fullText.match(/(?:^|[^\d])39\.\s*([\s\S]*?)(?=(?:^|[^\d])40\.\s*|\[\s*40\s*~|(?:^|[^\d])41\.\s*)/m);
-    if (!generic38 || !generic39) return;
-    const c38 = generic38[1].replace(/^\s*38\.\s*\n?/i, '').trim();
-    const c39 = generic39[1].replace(/^\s*39\.\s*\n?/i, '').trim();
-    if (c38.length < 30 || c39.length < 30) return;
-
-    let inst = '';
-    const im = fullText.match(/\[\s*38\s*~\s*39\s*\]\s*([^\r\n]+)/);
-    if (im) inst = im[1].replace(/\s+/g, ' ').trim();
-    if (!inst) inst = '글의 흐름으로 보아, 주어진 문장이 들어가기에 가장 적절한 곳을 고르시오.';
-
-    const synthetic = {
-      number: '38~39',
-      instruction: inst,
-      content: '38.\n' + c38 + '\n\n39.\n' + c39,
-      choices: [],
-      type: '객관식'
-    };
-
-    const idx = questions.findIndex(q => {
-      const s = String(q.number);
-      let n;
-      if (/^\d+~\d+$/.test(s)) n = parseInt(s.split('~')[0], 10);
-      else n = parseInt(s, 10);
-      return !isNaN(n) && n >= 40;
-    });
-    if (idx === -1) questions.push(synthetic);
-    else questions.splice(idx, 0, synthetic);
   }
 
   function recover36_37Content(questions, fullText) {
@@ -1962,7 +1775,7 @@
 
     function tryGeneric3839() {
       const generic38 = searchIn.match(/(?:^|[^\d])38\.\s*([\s\S]*?)(?=(?:^|[^\d])39\.\s*)/m);
-      const generic39 = searchIn.match(/(?:^|[^\d])39\.\s*([\s\S]*?)(?=(?:^|[^\d])40\.\s*|\[\s*40\s*~|(?:^|[^\d])41\.\s*)/m);
+      const generic39 = searchIn.match(/(?:^|[^\d])39\.\s*([\s\S]*?)(?=(?:^|[^\d])40\.\s*|\[\s*40\s*~|(?:^|[^\d])41\.\s*|$)/m);
       if (generic38 && generic39) {
         const c38 = generic38[1].replace(/^\s*38\.\s*\n?/i, '').trim();
         const c39 = generic39[1].replace(/^\s*39\.\s*\n?/i, '').trim();
@@ -2068,13 +1881,6 @@
       /글의\s*흐름으로\s*보아/.test(instr);
   }
 
-  /** 출력 라벨: [지문/선택지] (mergeEmbeddedChoicesIntoContent는 hasEmbeddedChoicesContent만 사용) */
-  function usePassageAndChoicesSectionTitle(q) {
-    if (hasEmbeddedChoicesContent(q)) return true;
-    if (/④/.test(q.content || '')) return true;
-    return false;
-  }
-
   function stripLeadingRangeLabelFromContent(result) {
     for (const q of result) {
       const num = String(q.number);
@@ -2144,7 +1950,7 @@
     questions.forEach((q, idx) => {
       const inst = q.instruction ? '[지시문]\n' + addPhraseUnderline(escapeHtml(q.instruction), 'html') + '\n\n' : '';
       let contentSection = '';
-      if (usePassageAndChoicesSectionTitle(q)) {
+      if (hasEmbeddedChoicesContent(q)) {
         contentSection = '[지문/선택지]\n' + addUnderlineFormatting(escapeHtml(q.content || ''), q.instruction, 'html') + '\n\n';
       } else {
         contentSection = '[지문]\n' + addUnderlineFormatting(escapeHtml(q.content || ''), q.instruction, 'html') + '\n\n';
@@ -2231,7 +2037,7 @@
       out += '='.repeat(18) + '\n';
       out += `${questionHeader(q)}\n` + '='.repeat(18) + '\n';
       if (q.instruction) out += '[지시문]\n' + addPhraseUnderline(escapeHtml(q.instruction), 'html') + '\n\n';
-      if (usePassageAndChoicesSectionTitle(q)) {
+      if (hasEmbeddedChoicesContent(q)) {
         out += '[지문/선택지]\n' + addUnderlineFormatting(escapeHtml(q.content || ''), q.instruction, 'html') + '\n\n';
       } else {
         out += '[지문]\n' + addUnderlineFormatting(escapeHtml(q.content || ''), q.instruction, 'html') + '\n\n';
@@ -2249,7 +2055,7 @@
     let out = '='.repeat(18) + '\n';
     out += `${questionHeader(q)}\n` + '='.repeat(18) + '\n';
     if (q.instruction) out += '[지시문]\n' + addPhraseUnderline(q.instruction, 'txt') + '\n\n';
-    if (usePassageAndChoicesSectionTitle(q)) {
+    if (hasEmbeddedChoicesContent(q)) {
       out += '[지문/선택지]\n' + addUnderlineFormatting(q.content || '', q.instruction, 'txt') + '\n\n';
     } else {
       out += '[지문]\n' + addUnderlineFormatting(q.content || '', q.instruction, 'txt') + '\n\n';
@@ -2271,7 +2077,7 @@
       out += `${questionHeader(q)}\n`;
       out += '='.repeat(18) + '\n';
       if (q.instruction) out += '[지시문]\n' + addPhraseUnderline(q.instruction, 'txt') + '\n\n';
-      if (usePassageAndChoicesSectionTitle(q)) {
+      if (hasEmbeddedChoicesContent(q)) {
         out += '[지문/선택지]\n' + addUnderlineFormatting(q.content || '', q.instruction, 'txt') + '\n\n';
       } else {
         out += '[지문]\n' + addUnderlineFormatting(q.content || '', q.instruction, 'txt') + '\n\n';

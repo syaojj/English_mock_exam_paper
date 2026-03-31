@@ -206,7 +206,7 @@
   <div class="container">
     <main>
       <h1><img src="favicon.png" alt="" class="title-icon"> 모의고사 문제 추출기</h1>
-      <p class="version">v9.6</p>
+      <p class="version">v9.2</p>
       <div id="dropZone">
         <p id="dropZoneText">PDF를 드래그하거나 클릭하여 업로드</p>
         <p class="hint">모의고사, 시험지, 학습자료 PDF 지원</p>
@@ -464,50 +464,8 @@
     return questions;
   }
 
-  /** 지문: 단일 줄바꿈→공백, 문장 단위 마침표 뒤 줄바꿈(Ph.D·이메일·소수 등 제외) */
-  function insertSentenceBreaksAfterPeriod(para) {
-    const tokens = [];
-    const pushPh = (m) => { const i = tokens.length; tokens.push(m); return '\uE000' + i + '\uE001'; };
-
-    let s = para;
-    s = s.replace(/\.{3,}/g, pushPh);
-    s = s.replace(/\d+\.\d+(?:[eE][+-]?\d+)?/g, pushPh);
-    s = s.replace(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z0-9.-]+/g, pushPh);
-    const abbrRe = /\b(?:Ph\.D\.|Ph\.D|E\.g\.|e\.g\.|I\.e\.|i\.e\.|Mr\.|Mrs\.|Ms\.|Dr\.|Vs\.|vs\.|Jr\.|Sr\.|Inc\.|Ltd\.|Prof\.|U\.S\.|U\.K\.|E\.U\.|a\.m\.|p\.m\.|etc\.)(?=\s|$)/gi;
-    s = s.replace(abbrRe, pushPh);
-    s = s.replace(/(^|\n)(\s*)(\d{1,2})\.\s/g, (_, a, ws, n) => a + ws + pushPh(n + '. '));
-    s = s.replace(/(?<=\.\s)(\d{1,2})\.\s/g, pushPh);
-    s = s.replace(/\.(\s+)(?=[A-Z가-힣①-⑤㉠-㉥Ⓐ-Ⓔ]|[(（"]|\d)/g, '.\n');
-    for (let i = tokens.length - 1; i >= 0; i--) {
-      s = s.split('\uE000' + i + '\uE001').join(tokens[i]);
-    }
-    return s.replace(/[ \t]+/g, ' ').replace(/\n[ \t]+/g, '\n').replace(/[ \t]+\n/g, '\n').trim();
-  }
-
-  /** 불릿(•) 앞에 줄바꿈 — 공백만 있는 경우 제거 후 한 줄로 */
-  function insertBulletNewlines(para) {
-    if (!para || !/•/.test(para)) return para;
-    return para.replace(/(?<=\S)\s+•/g, '\n•').replace(/\n{3,}/g, '\n\n');
-  }
-
-  function formatPassageLineBreaks(raw) {
-    if (!raw || !String(raw).trim()) return raw;
-    const str = String(raw);
-    const footParts = str.split(/\n(?=\s*\*)/);
-    const main = footParts[0];
-    const foot = footParts.length > 1 ? '\n' + footParts.slice(1).join('\n') : '';
-
-    let s = main.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-    const paras = s.split(/\n{2,}/).map(p => p.replace(/\n/g, ' ').replace(/[ \t]+/g, ' ').trim()).filter(Boolean);
-    const formatted = paras.map(p => insertBulletNewlines(insertSentenceBreaksAfterPeriod(p)));
-    return formatted.join('\n\n') + foot;
-  }
-
   function finalizeExtractedResult(result) {
     applyDisplayInstructionCleanup(result);
-    for (const q of result) {
-      if (q.content) q.content = formatPassageLineBreaks(q.content);
-    }
     sortExtractedQuestionsByNumber(result);
     return result;
   }
@@ -1715,7 +1673,6 @@
       consolidate4142HeaderQuestions(questions);
       mergeRangeQuestions(questions);
       deduplicateRangeQuestions(questions);
-      inject3839MergedQuestionFromFullText(questions, text);
       splitMergedQuestions(questions);
       splitRangeWithoutDelimiter(questions);
       reassignMisplacedPassages(questions);
@@ -1846,7 +1803,6 @@
       consolidate4142HeaderQuestions(questions);
       mergeRangeQuestions(questions);
       deduplicateRangeQuestions(questions);
-      inject3839MergedQuestionFromFullText(questions, text);
       splitMergedQuestions(questions);
       splitRangeWithoutDelimiter(questions);
       reassignMisplacedPassages(questions);
@@ -1902,44 +1858,6 @@
     }
   }
 
-  /** 병합 실패(열 순서 등)로 questions에 38·39·38~39가 없을 때 fullText에서 병합 문항 삽입 → expand에서 목록에 노출 */
-  function inject3839MergedQuestionFromFullText(questions, fullText) {
-    if (!questions || !fullText || !fullText.trim()) return;
-    if (questions.some(q => String(q.number) === '38~39')) return;
-    if (questions.some(q => String(q.number) === '38')) return;
-    if (questions.some(q => String(q.number) === '39')) return;
-
-    const generic38 = fullText.match(/(?:^|[^\d])38\.\s*([\s\S]*?)(?=(?:^|[^\d])39\.\s*)/m);
-    const generic39 = fullText.match(/(?:^|[^\d])39\.\s*([\s\S]*?)(?=(?:^|[^\d])40\.\s*|\[\s*40\s*~|(?:^|[^\d])41\.\s*)/m);
-    if (!generic38 || !generic39) return;
-    const c38 = generic38[1].replace(/^\s*38\.\s*\n?/i, '').trim();
-    const c39 = generic39[1].replace(/^\s*39\.\s*\n?/i, '').trim();
-    if (c38.length < 30 || c39.length < 30) return;
-
-    let inst = '';
-    const im = fullText.match(/\[\s*38\s*~\s*39\s*\]\s*([^\r\n]+)/);
-    if (im) inst = im[1].replace(/\s+/g, ' ').trim();
-    if (!inst) inst = '글의 흐름으로 보아, 주어진 문장이 들어가기에 가장 적절한 곳을 고르시오.';
-
-    const synthetic = {
-      number: '38~39',
-      instruction: inst,
-      content: '38.\n' + c38 + '\n\n39.\n' + c39,
-      choices: [],
-      type: '객관식'
-    };
-
-    const idx = questions.findIndex(q => {
-      const s = String(q.number);
-      let n;
-      if (/^\d+~\d+$/.test(s)) n = parseInt(s.split('~')[0], 10);
-      else n = parseInt(s, 10);
-      return !isNaN(n) && n >= 40;
-    });
-    if (idx === -1) questions.push(synthetic);
-    else questions.splice(idx, 0, synthetic);
-  }
-
   function recover36_37Content(questions, fullText) {
     const target = questions.find(q => String(q.number) === '36~37');
     if (!target || (target.content || '').trim().length > 100) return;
@@ -1962,7 +1880,7 @@
 
     function tryGeneric3839() {
       const generic38 = searchIn.match(/(?:^|[^\d])38\.\s*([\s\S]*?)(?=(?:^|[^\d])39\.\s*)/m);
-      const generic39 = searchIn.match(/(?:^|[^\d])39\.\s*([\s\S]*?)(?=(?:^|[^\d])40\.\s*|\[\s*40\s*~|(?:^|[^\d])41\.\s*)/m);
+      const generic39 = searchIn.match(/(?:^|[^\d])39\.\s*([\s\S]*?)(?=(?:^|[^\d])40\.\s*|\[\s*40\s*~|(?:^|[^\d])41\.\s*|$)/m);
       if (generic38 && generic39) {
         const c38 = generic38[1].replace(/^\s*38\.\s*\n?/i, '').trim();
         const c39 = generic39[1].replace(/^\s*39\.\s*\n?/i, '').trim();
