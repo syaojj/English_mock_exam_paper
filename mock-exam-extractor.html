@@ -206,7 +206,7 @@
   <div class="container">
     <main>
       <h1><img src="favicon.png" alt="" class="title-icon"> 모의고사 문제 추출기</h1>
-      <p class="version">v9.7</p>
+      <p class="version">v9.8</p>
       <div id="dropZone">
         <p id="dropZoneText">PDF를 드래그하거나 클릭하여 업로드</p>
         <p class="hint">모의고사, 시험지, 학습자료 PDF 지원</p>
@@ -2333,15 +2333,30 @@ ${body}
     return div.innerHTML.replace(/\n/g, '<br>');
   }
 
+  /** Excel/CSV: 지문을 줄바꿈 기준 한 행씩(문장 단위 후처리와 동일) */
+  function splitPassageLinesForExcel(content) {
+    const lines = String(content || '').split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    return lines.length ? lines : [''];
+  }
+
   function formatCsv(questions) {
     const header = '문제번호,유형,지시문,지문,①,②,③,④,⑤';
-    const rows = questions.map(q => {
+    const rows = [];
+    for (const q of questions) {
       const opts = ['', '', '', '', ''];
-      q.choices.forEach((c, i) => { if (i < 5) opts[i] = c.text.replace(/"/g, '""'); });
+      q.choices.forEach((c, i) => { if (i < 5) opts[i] = (c.text || '').replace(/"/g, '""'); });
       const inst = addPhraseUnderline(q.instruction || '', 'txt').replace(/"/g, '""');
-      const cont = (q.content || '').replace(/"/g, '""');
-      return `${displayNumber(q)},${q.type},"${inst}","${cont}",${opts.map(o => '"' + o + '"').join(',')}`;
-    });
+      const lines = splitPassageLinesForExcel(q.content);
+      const emptyChoices = ',"","","","",""';
+      lines.forEach((line, idx) => {
+        const cont = line.replace(/"/g, '""');
+        if (idx === 0) {
+          rows.push(`${displayNumber(q)},${q.type},"${inst}","${cont}",${opts.map(o => '"' + o + '"').join(',')}`);
+        } else {
+          rows.push(`,,,"${cont}"${emptyChoices}`);
+        }
+      });
+    }
     return '\uFEFF' + header + '\n' + rows.join('\n');
   }
 
@@ -2351,12 +2366,21 @@ ${body}
       const opts = ['', '', '', '', ''];
       q.choices.forEach((c, i) => { if (i < 5) opts[i] = escapeHtml(c.text); });
       const inst = addPhraseUnderline(escapeHtml(q.instruction || ''), 'html');
-      const cont = addUnderlineFormatting(escapeHtml(q.content || ''), q.instruction, 'html');
-      tbl += '<tr>';
-      tbl += `<td>${displayNumber(q)}</td><td>${q.type || '객관식'}</td>`;
-      tbl += `<td>${inst}</td><td>${cont}</td>`;
-      opts.forEach(o => { tbl += `<td>${o}</td>`; });
-      tbl += '</tr>';
+      const lines = splitPassageLinesForExcel(q.content);
+      lines.forEach((line, idx) => {
+        const contCell = addUnderlineFormatting(escapeHtml(line), q.instruction, 'html');
+        tbl += '<tr>';
+        if (idx === 0) {
+          tbl += `<td>${displayNumber(q)}</td><td>${q.type || '객관식'}</td>`;
+          tbl += `<td>${inst}</td><td>${contCell}</td>`;
+          opts.forEach(o => { tbl += `<td>${o}</td>`; });
+        } else {
+          tbl += '<td></td><td></td><td></td>';
+          tbl += `<td>${contCell}</td>`;
+          for (let c = 0; c < 5; c++) tbl += '<td></td>';
+        }
+        tbl += '</tr>';
+      });
     }
     tbl += '</tbody></table>';
     return `<?xml version="1.0" encoding="UTF-8"?>
