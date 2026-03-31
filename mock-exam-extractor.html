@@ -206,7 +206,7 @@
   <div class="container">
     <main>
       <h1><img src="favicon.png" alt="" class="title-icon"> 모의고사 문제 추출기</h1>
-      <p class="version">v9.8</p>
+      <p class="version">v9.9</p>
       <div id="dropZone">
         <p id="dropZoneText">PDF를 드래그하거나 클릭하여 업로드</p>
         <p class="hint">모의고사, 시험지, 학습자료 PDF 지원</p>
@@ -490,6 +490,19 @@
     return para.replace(/(?<=\S)\s+•/g, '\n•').replace(/\n{3,}/g, '\n\n');
   }
 
+  /**
+   * 추가 유형: PDF 객체·PUA 문자 뒤 문장 시작 / ."But 붙음 / 닫는따옴표 직후 ①~⑤ / 마침표 직후 ①~⑤(공백 없음)
+   * insertSentenceBreaksAfterPeriod 이후 호출(플레이스홀더 해제 후)
+   */
+  function applyExtraPassageLineBreaks(para) {
+    let s = para;
+    s = s.replace(/\.(["\u201D])But\b/g, '.\n$1But');
+    s = s.replace(/([\u201D"])([①-⑤㉠-㉥Ⓐ-Ⓔ])(?=\s)/g, '$1\n$2');
+    s = s.replace(/\.([①-⑤㉠-㉥Ⓐ-Ⓔ])/g, '.\n$1');
+    s = s.replace(/\.\s*(?:[\uFFFC\uFFFD\u200B\uFEFF]|[\uE000-\uF8FF])+\s*(?=[A-Z])/g, '.\n');
+    return s.replace(/\n{3,}/g, '\n\n');
+  }
+
   function formatPassageLineBreaks(raw) {
     if (!raw || !String(raw).trim()) return raw;
     const str = String(raw);
@@ -499,7 +512,7 @@
 
     let s = main.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
     const paras = s.split(/\n{2,}/).map(p => p.replace(/\n/g, ' ').replace(/[ \t]+/g, ' ').trim()).filter(Boolean);
-    const formatted = paras.map(p => insertBulletNewlines(insertSentenceBreaksAfterPeriod(p)));
+    const formatted = paras.map(p => insertBulletNewlines(applyExtraPassageLineBreaks(insertSentenceBreaksAfterPeriod(p))));
     return formatted.join('\n\n') + foot;
   }
 
