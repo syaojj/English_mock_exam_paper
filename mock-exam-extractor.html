@@ -206,7 +206,7 @@
   <div class="container">
     <main>
       <h1><img src="favicon.png" alt="" class="title-icon"> 모의고사 문제 추출기</h1>
-      <p class="version">v9.9</p>
+      <p class="version">v10.2</p>
       <div id="dropZone">
         <p id="dropZoneText">PDF를 드래그하거나 클릭하여 업로드</p>
         <p class="hint">모의고사, 시험지, 학습자료 PDF 지원</p>
@@ -2329,7 +2329,7 @@
     .question { page-break-inside: avoid; margin-bottom: 20px; border-bottom: 1px solid #ddd; padding-bottom: 15px; }
     .number { font-weight: bold; color: #0066cc; }
     .instruction { color: #555; font-weight: 500; margin: 8px 0; }
-    .content { margin: 10px 0; line-height: 1.6; }
+    .content { margin: 10px 0; line-height: 1.6; text-align: justify; text-justify: inter-ideograph; }
     .choices { margin: 10px 0; }
     .choices .choice { margin: 4px 0; }
   </style>
@@ -2371,6 +2371,75 @@ ${body}
       });
     }
     return '\uFEFF' + header + '\n' + rows.join('\n');
+  }
+
+  /** Excel XML(SpreadsheetML): C~I열 너비 28·자동 줄 바꿈 */
+  function excelXmlEscape(s) {
+    return String(s ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/\r\n|\r|\n/g, '&#10;');
+  }
+
+  function formatExcelSpreadsheetML(questions) {
+    const cell = (styleId, text) => `<Cell ss:StyleID="${styleId}"><Data ss:Type="String">${excelXmlEscape(text)}</Data></Cell>`;
+    const rowParts = [];
+    rowParts.push('<Row>' +
+      cell('HdrAB', '문제번호') + cell('HdrAB', '유형') +
+      cell('HdrWrap', '지시문') + cell('HdrWrap', '지문') +
+      cell('HdrWrap', '①') + cell('HdrWrap', '②') + cell('HdrWrap', '③') + cell('HdrWrap', '④') + cell('HdrWrap', '⑤') +
+      '</Row>');
+    for (const q of questions) {
+      const opts = ['', '', '', '', ''];
+      q.choices.forEach((c, i) => { if (i < 5) opts[i] = c.text || ''; });
+      const inst = addPhraseUnderline(q.instruction || '', 'txt');
+      const lines = splitPassageLinesForExcel(q.content);
+      lines.forEach((line, idx) => {
+        if (idx === 0) {
+          rowParts.push('<Row>' +
+            cell('AB', displayNumber(q)) + cell('AB', q.type || '객관식') +
+            cell('Wrap', inst) + cell('Wrap', line) +
+            opts.map(t => cell('Wrap', t)).join('') +
+            '</Row>');
+        } else {
+          rowParts.push('<Row>' +
+            cell('AB', '') + cell('AB', '') + cell('Wrap', '') + cell('Wrap', line) +
+            cell('Wrap', '') + cell('Wrap', '') + cell('Wrap', '') + cell('Wrap', '') + cell('Wrap', '') +
+            '</Row>');
+        }
+      });
+    }
+    const nRows = rowParts.length;
+    return `<?xml version="1.0" encoding="UTF-8"?>
+<?mso-application progid="Excel.Sheet"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:o="urn:schemas-microsoft-com:office:office"
+ xmlns:x="urn:schemas-microsoft-com:office:excel"
+ xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
+ <Styles>
+  <Style ss:ID="Default" ss:Name="Normal"><Alignment ss:Vertical="Bottom"/></Style>
+  <Style ss:ID="HdrAB"><Font ss:Bold="1"/><Alignment ss:Vertical="Center" ss:WrapText="0"/></Style>
+  <Style ss:ID="HdrWrap"><Font ss:Bold="1"/><Alignment ss:Vertical="Top" ss:WrapText="1"/></Style>
+  <Style ss:ID="AB"><Alignment ss:Vertical="Top" ss:WrapText="0"/></Style>
+  <Style ss:ID="Wrap"><Alignment ss:Vertical="Top" ss:WrapText="1"/></Style>
+ </Styles>
+ <Worksheet ss:Name="모의고사">
+  <Table ss:ExpandedColumnCount="9" ss:ExpandedRowCount="${nRows}">
+   <Column ss:AutoFitWidth="0" ss:Width="72"/>
+   <Column ss:AutoFitWidth="0" ss:Width="72"/>
+   <Column ss:AutoFitWidth="0" ss:Width="196"/>
+   <Column ss:AutoFitWidth="0" ss:Width="196"/>
+   <Column ss:AutoFitWidth="0" ss:Width="196"/>
+   <Column ss:AutoFitWidth="0" ss:Width="196"/>
+   <Column ss:AutoFitWidth="0" ss:Width="196"/>
+   <Column ss:AutoFitWidth="0" ss:Width="196"/>
+   <Column ss:AutoFitWidth="0" ss:Width="196"/>
+   ${rowParts.join('\n   ')}
+  </Table>
+ </Worksheet>
+</Workbook>`;
   }
 
   function formatExcelHtml(questions) {
@@ -2487,14 +2556,14 @@ ${body}
 
       const txtBlob = createBlob(formatTxt(extractedData), 'text/plain;charset=utf-8');
       const htmlBlob = createBlob(formatHtml(extractedData), 'application/vnd.ms-word;charset=utf-8');
-      const csvBlob = createBlob(formatCsv(extractedData), 'text/csv;charset=utf-8');
+      const xlsBlob = createBlob('\uFEFF' + formatExcelSpreadsheetML(extractedData), 'application/vnd.ms-excel;charset=utf-8');
 
       txtDownload.href = URL.createObjectURL(txtBlob);
       txtDownload.download = `${fileSuffix}.txt`;
       wordDownload.href = URL.createObjectURL(htmlBlob);
       wordDownload.download = `${fileSuffix}.doc`;
-      excelDownload.href = URL.createObjectURL(csvBlob);
-      excelDownload.download = `${fileSuffix}.csv`;
+      excelDownload.href = URL.createObjectURL(xlsBlob);
+      excelDownload.download = `${fileSuffix}.xls`;
 
     } catch (err) {
       setStatus('오류: ' + err.message, 'error');
